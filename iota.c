@@ -1023,24 +1023,7 @@ object *eval(object *exp, object *env) {
     else if (is_application(exp)) {
       proc = eval(operator(exp), env);
       args = list_of_values(operands(exp), env);
-      if (is_primitive_proc(proc))
-        return (proc->data.primitive_proc.fn)(args);
-      else if (is_compound_proc(proc)) {
-        env = extend_environment(
-          proc->data.compound_proc.parameters,
-          args,
-          proc->data.compound_proc.env);
-        exp = proc->data.compound_proc.body;
-        while (!is_last_exp(exp)) {
-          eval(car(exp), env);
-          exp = cdr(exp);
-        }
-        exp = car(exp);
-      }
-      else {
-        fprintf(stderr, "Unknown procedure type\n");
-        exit(1);
-      }
+      return apply(proc, args);
     }
     else {
       fprintf(stderr,
@@ -1113,9 +1096,21 @@ void write(object *obj) {
 /********/
 
 int main() {
-  printf("Iota-Bootstrap.\nC-c to exit.\n");
-
+  char bootstrap_code_fname[128] = "bootstrap.l";
+  FILE *bootstrap_file;
+  object *obj;
+  printf("Iota-Bootstrap.\n");
+  
+  printf("Initializing core...\n");
   init();
+  
+  //printf("Bootstrapping iota...\n");
+  //bootstrap_file = fopen(bootstrap_code_fname,"r");
+  //while((obj = 
+  //fclose(bootstrap_file);
+  
+  
+  printf("C-c to exit.\n");
 
   while (1) {
     printf("=> ");
