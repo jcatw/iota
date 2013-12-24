@@ -937,6 +937,13 @@ object *rest_operands(object *ops) {
 }
 
 object *eval(object *exp, object *env);
+object *eval_sequence(object *exps, object *env) {
+  while(!is_last_exp(exps)) {
+    eval(car(exps), env);
+    exps = cdr(exps);
+  }
+  return eval(car(exps), env);
+}
 
 object *list_of_values(object *exps, object *env) {
   if (is_no_operands(exps)) {
@@ -945,6 +952,29 @@ object *list_of_values(object *exps, object *env) {
   else {
     return cons(eval(first_operand(exps), env),
                 list_of_values(rest_operands(exps), env));
+  }
+}
+
+object *apply(object *proc, object *args) {
+  object *exp;
+  if (is_primitive_proc(proc))
+    return (proc->data.primitive_proc.fn)(args);
+  else if (is_compound_proc(proc)) {
+    exp = proc->data.compound_proc.body;
+    //while (!is_last_exp(exp)) {
+    //  eval(car(exp), env);
+    //  exp = cdr(exp);
+    //}
+    //exp = car(exp);
+    return eval_sequence(exp,
+                         extend_environment(
+                           proc->data.compound_proc.parameters,
+                           args,
+                           proc->data.compound_proc.env));
+  }
+  else {
+    fprintf(stderr, "Unknown procedure type\n");
+    exit(1);
   }
 }
 
