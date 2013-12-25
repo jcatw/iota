@@ -681,8 +681,10 @@ object *read(FILE *in) {
   eat_whitespace(in);
 
   c = getc(in);
-  
-  if(c == '#') {
+
+  if(c == EOF)
+    return NULL;
+  else if(c == '#') {
     c = getc(in);
     switch(c) {
     //read a character
@@ -1095,28 +1097,54 @@ void write(object *obj) {
 /* repl */
 /********/
 
+void read_eval_file(FILE* in) {
+  object *obj;
+  while((obj = read(in)) != NULL) {
+    eval(obj, the_global_environment);
+    //write(eval(obj, the_global_environment));
+    //printf("\n");
+  }
+}
+
+void read_eval_print_file(FILE *in) {
+  object *obj;
+  while((obj = read(in)) != NULL) {
+    //eval(obj, the_global_environment);
+    write(eval(obj, the_global_environment));
+    printf("\n");
+  }
+}
+
+void repl() {
+  printf("C-c to exit.\n");
+  while(1) {
+    printf("=> ");
+    write(eval(read(stdin), the_global_environment));
+    printf("\n");
+  }
+}
+
 int main() {
   char bootstrap_code_fname[128] = "bootstrap.l";
-  FILE *bootstrap_file;
-  object *obj;
+  FILE *bootstrap_code;
+  //object *obj;
   printf("Iota-Bootstrap.\n");
   
   printf("Initializing core...\n");
   init();
   
-  //printf("Bootstrapping iota...\n");
-  //bootstrap_file = fopen(bootstrap_code_fname,"r");
-  //while((obj = 
-  //fclose(bootstrap_file);
+  printf("Bootstrapping iota...\n");
+  bootstrap_code = fopen(bootstrap_code_fname,"r");
+  read_eval_print_file(bootstrap_code);
+  fclose(bootstrap_code);
   
-  
-  printf("C-c to exit.\n");
+  //while (1) {
+  //  printf("=> ");
+  //  write(eval(read(stdin), the_global_environment));
+  //  printf("\n");
+  //}
 
-  while (1) {
-    printf("=> ");
-    write(eval(read(stdin), the_global_environment));
-    printf("\n");
-  }
+  repl(stdin);
 
   return 0;
 }
