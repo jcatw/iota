@@ -64,6 +64,7 @@ object *define_symbol;
 object *set_symbol;
 object *if_symbol;
 object *lambda_symbol;
+object *begin_symbol;
 
 object *the_empty_environment;
 object *the_global_environment;
@@ -225,6 +226,24 @@ object *is_cons_proc(object *args) {
 
 object *is_procedure_proc(object *args) {
   return is_primitive_proc(car(args)) ? true : false;
+}
+
+char is_tagged_list(object *expression, object *tag) {
+  object *first;
+
+  if(is_cons(expression)) {
+    first = car(expression);
+    return is_symbol(first) && (first == tag);
+  }
+  return 0;
+}
+
+object *is_tagged_list_proc(object *args) {
+  object *exp, *tag;
+  exp = car(args);
+  tag = cadr(args);
+
+  return is_tagged_list(exp, tag) ? true : false;
 }
 
 object *char_to_integer_proc(object *args) {
@@ -549,6 +568,7 @@ void init() {
   set_symbol = make_symbol("set!");
   if_symbol = make_symbol("if");
   lambda_symbol = make_symbol("lambda");
+  begin_symbol = make_symbol("begin");
 
   the_empty_environment = nil;
   the_global_environment = setup_environment();
@@ -564,6 +584,7 @@ void init() {
   add_procedure("char?"      , is_char_proc      );
   add_procedure("string?"    , is_string_proc    );
   add_procedure("procedure?" , is_procedure_proc );
+  add_procedure("tagged-list?", is_tagged_list_proc);
 
   add_procedure("char->integer", char_to_integer_proc);
   add_procedure("integer->char", integer_to_char_proc);
@@ -820,16 +841,6 @@ char is_variable(object *exp) {
   return is_symbol(exp);
 }
 
-char is_tagged_list(object *expression, object *tag) {
-  object *first;
-
-  if(is_cons(expression)) {
-    first = car(expression);
-    return is_symbol(first) && (first == tag);
-  }
-  return 0;
-}
-
 char is_quoted(object *expression) {
   return is_tagged_list(expression, quote_symbol);
 }
@@ -910,6 +921,18 @@ object *lambda_body(object *exp) {
   return cddr(exp);
 }
 
+object *make_begin(object *exp) {
+  return cons(begin_symbol, exp);
+}
+
+char is_begin(object *exp) {
+  return is_tagged_list(exp, begin_symbol);
+}
+
+object *begin_actions(object *exp) {
+  return cdr(exp);
+}
+
 char is_last_exp(object *exps) {
   return is_nil(cdr(exps));
 }
@@ -963,11 +986,6 @@ object *apply(object *proc, object *args) {
     return (proc->data.primitive_proc.fn)(args);
   else if (is_compound_proc(proc)) {
     exp = proc->data.compound_proc.body;
-    //while (!is_last_exp(exp)) {
-    //  eval(car(exp), env);
-    //  exp = cdr(exp);
-    //}
-    //exp = car(exp);
     return eval_sequence(exp,
                          extend_environment(
                            proc->data.compound_proc.parameters,
@@ -1016,6 +1034,9 @@ object *eval(object *exp, object *env) {
     }
     else if (is_if(exp)) {
       exp = is_true(eval(if_predicate(exp), env)) ? if_consequent(exp) : if_alternative(exp);
+    }
+    else if (is_begin(exp)) {
+      return eval_sequence(begin_actions(exp), env);
     }
     else if (is_lambda(exp)) {
       return make_compound_proc(lambda_parameters(exp),
