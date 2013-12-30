@@ -1012,13 +1012,21 @@ object *apply(object *proc, object *args) {
   object *exp;
   if (is_primitive_proc(proc))
     return (proc->data.primitive_proc.fn)(args);
-  else if (is_compound_proc(proc) || is_macro(proc)) {
+  else if (is_compound_proc(proc)) {
     exp = proc->data.compound_proc.body;
     return eval_sequence(exp,
                          extend_environment(
                            proc->data.compound_proc.parameters,
                            args,
                            proc->data.compound_proc.env));
+  }
+  else if(is_macro(proc)) {
+    exp = proc->data.macro.body;
+    return eval_sequence(exp,
+                         extend_environment(
+                           proc->data.macro.parameters,
+                           args,
+                           proc->data.macro.env));
   }
   else {
     fprintf(stderr, "Unknown procedure type\n");
