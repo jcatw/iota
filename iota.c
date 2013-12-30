@@ -63,6 +63,8 @@ object *false;
 object *true;
 object *symbol_table;
 object *quote_symbol;
+object *backquote_symbol;
+object *comma_symbol;
 object *define_symbol;
 object *set_symbol;
 object *if_symbol;
@@ -568,6 +570,8 @@ void init() {
 
   symbol_table = nil;
   quote_symbol = make_symbol("quote");
+  backquote_symbol = make_symbol("backquote");
+  comma_symbol = make_symbol("comma");
   define_symbol = make_symbol("define");
   set_symbol = make_symbol("set!");
   if_symbol = make_symbol("if");
@@ -614,8 +618,6 @@ void init() {
   add_procedure("list", list_proc);
 
   add_procedure("eq?", is_eq_proc);
-
-  
 }
 
 /********/
@@ -828,6 +830,14 @@ object *read(FILE *in) {
   else if(c == '\'') {
     return cons(quote_symbol, cons(read(in), nil));
   }
+  //read a backquoted expression
+  else if(c == '`') {
+    return cons(backquote_symbol, cons(read(in), nil));
+  }
+  // read an escaped (comma'd) expression
+  else if(c == ',') {
+    return cons(comma_symbol, cons(read(in), nil));
+  }
   else {
     fprintf(stderr, "Bad input: unexpected '%c'\n", c);
     exit(1);
@@ -1020,16 +1030,26 @@ object *apply(object *proc, object *args) {
                            args,
                            proc->data.compound_proc.env));
   }
-  else if(is_macro(proc)) {
-    exp = proc->data.macro.body;
-    return eval_sequence(exp,
-                         extend_environment(
-                           proc->data.macro.parameters,
-                           args,
-                           proc->data.macro.env));
-  }
   else {
     fprintf(stderr, "Unknown procedure type\n");
+    exit(1);
+  }
+}
+
+object *apply_macro(object *proc, object *args, object *env) {
+  object *body;
+  object *expanded_body;
+  if(is_macro(proc)) {
+    body = proc->data.macro.body;
+    expanded_body = eval_sequence(body,
+                                  extend_environment(
+                                    proc->data.macro.parameters,
+                                    args,
+                                    proc->data.macro.env));
+    return eval(expanded_body, env);
+  }
+  else {
+    fprintf(stderr, "Tried to apply non-macro as macro.\n");
     exit(1);
   }
 }
@@ -1050,6 +1070,27 @@ object *eval_definition(object *exp, object *env) {
   return definition_variable(exp);
 }
 
+char is_backquoted(object *exp) {
+  return is_tagged_list(exp, backquote_symbol);
+}
+
+char is_escaped(object *exp) {
+  return is_tagged_list(exp, comma_symbol);
+}
+
+object *eval_backquoted(object *exp, object *env) {
+  if(is_escaped(exp)) {
+    return eval(text_of_quotation(exp), env);
+  }
+  else if(is_cons(exp)) {
+    return cons(eval_backquoted(car(exp), env),
+                eval_backquoted(cdr(exp), env));
+  }
+  else {
+    return exp;
+  }
+}
+
 object *eval(object *exp, object *env) {
   object *proc, *args;
   while(1) {
@@ -1061,6 +1102,9 @@ object *eval(object *exp, object *env) {
     }
     else if (is_quoted(exp)) {
       return text_of_quotation(exp);
+    }
+    else if (is_backquoted(exp)) {
+      return eval_backquoted(text_of_quotation(exp), env);
     }
     else if (is_assignment(exp)) {
       return eval_assignment(exp, env);
@@ -1086,11 +1130,14 @@ object *eval(object *exp, object *env) {
     }
     else if (is_application(exp)) {
       proc = eval(operator(exp), env);
-      if(is_macro(proc))
+      if(is_macro(proc)) {
         args = operands(exp);
-      else
+        return apply_macro(proc, args, env);
+      }
+      else {
         args = list_of_values(operands(exp), env);
-      return apply(proc, args);
+        return apply(proc, args);
+      }
     }
     else {
       fprintf(stderr,
