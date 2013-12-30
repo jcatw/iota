@@ -10,9 +10,7 @@
 /* language */
 /************/
 
-typedef enum {NIL, BOOLEAN, SYMBOL, FIXNUM,
-              CHARACTER, STRING, CONS,
-              PRIMITIVE_PROC, COMPOUND_PROC} object_type;
+typedef enum {NIL, BOOLEAN, SYMBOL, FIXNUM, CHARACTER, STRING, CONS, MACRO, PRIMITIVE_PROC, COMPOUND_PROC} object_type;
 
 typedef struct object {
   object_type type;
@@ -44,6 +42,11 @@ typedef struct object {
       struct object *body;
       struct object *env;
     } compound_proc;
+    struct {
+      struct object *parameters;
+      struct object *body;
+      struct object *env;
+    } macro;
   } data;
 } object;
 
@@ -65,6 +68,7 @@ object *set_symbol;
 object *if_symbol;
 object *lambda_symbol;
 object *begin_symbol;
+object *macro_symbol;
 
 object *the_empty_environment;
 object *the_global_environment;
@@ -569,6 +573,7 @@ void init() {
   if_symbol = make_symbol("if");
   lambda_symbol = make_symbol("lambda");
   begin_symbol = make_symbol("begin");
+  macro_symbol = make_symbol("macro");
 
   the_empty_environment = nil;
   the_global_environment = setup_environment();
@@ -921,6 +926,29 @@ object *lambda_body(object *exp) {
   return cddr(exp);
 }
 
+char is_macro (object *obj) {
+  //return (car(exp))->type == MACRO;
+  return obj->type == MACRO;
+}
+
+char is_macro_def(object *exp) {
+  return is_tagged_list(exp, macro_symbol);
+}
+
+object *make_macro(object *params,
+                   object *body,
+                   object *env) {
+  object *obj;
+
+  obj = alloc_object();
+  obj->type = MACRO;
+  obj->data.macro.parameters = params;
+  obj->data.macro.body = body;
+  obj->data.macro.env = env;
+
+  return obj;
+}
+
 object *make_begin(object *exp) {
   return cons(begin_symbol, exp);
 }
@@ -984,7 +1012,7 @@ object *apply(object *proc, object *args) {
   object *exp;
   if (is_primitive_proc(proc))
     return (proc->data.primitive_proc.fn)(args);
-  else if (is_compound_proc(proc)) {
+  else if (is_compound_proc(proc) || is_macro(proc)) {
     exp = proc->data.compound_proc.body;
     return eval_sequence(exp,
                          extend_environment(
@@ -1043,9 +1071,17 @@ object *eval(object *exp, object *env) {
                                 lambda_body(exp),
                                 env);
     }
+    else if (is_macro_def(exp)) {
+      return make_macro(lambda_parameters(exp),
+                        lambda_body(exp),
+                        env);
+    }
     else if (is_application(exp)) {
       proc = eval(operator(exp), env);
-      args = list_of_values(operands(exp), env);
+      if(is_macro(proc))
+        args = operands(exp);
+      else
+        args = list_of_values(operands(exp), env);
       return apply(proc, args);
     }
     else {
@@ -1107,6 +1143,9 @@ void write(object *obj) {
   case COMPOUND_PROC:
     printf("#<procedure>");
     break;
+  case MACRO:
+    printf("#<macro>");
+    break;
   default:
     fprintf(stderr, "Cannot write unknown type.\n");
     exit(1);
@@ -1137,10 +1176,15 @@ void read_eval_print_file(FILE *in) {
 }
 
 void repl() {
+  object *read_lisp_thing;
+  object *evaled_lisp_thing;
   printf("C-c to exit.\n");
   while(1) {
     printf("=> ");
-    write(eval(read(stdin), the_global_environment));
+    read_lisp_thing = read(stdin);
+    evaled_lisp_thing = eval(read_lisp_thing, the_global_environment);
+    write(evaled_lisp_thing);
+    //write(eval(read(stdin), the_global_environment));
     printf("\n");
   }
 }
@@ -1158,12 +1202,6 @@ int main() {
   bootstrap_code = fopen(bootstrap_code_fname,"r");
   read_eval_print_file(bootstrap_code);
   fclose(bootstrap_code);
-  
-  //while (1) {
-  //  printf("=> ");
-  //  write(eval(read(stdin), the_global_environment));
-  //  printf("\n");
-  //}
 
   repl(stdin);
 
