@@ -8,7 +8,7 @@
       (cons (f (car l)) (map f (cdr l)))))
 
 (define let
-  (macro (assignments body)
+  (macro (assignments :rest body)
     `((lambda ,(map car assignments)
 	,@body)
       ,@(map cadr assignments))))

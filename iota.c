@@ -76,6 +76,7 @@ object *if_symbol;
 object *lambda_symbol;
 object *begin_symbol;
 object *macro_symbol;
+object *rest_keyword;
 
 object *the_empty_environment;
 object *the_global_environment;
@@ -446,32 +447,48 @@ object *len_proc(object *args) {
   return make_fixnum(len(car(args)));
 }
 
+char is_eq(object *obj1, object *obj2) {
+  if(obj1->type != obj2->type)
+    return 0;
+  switch (obj1->type) {
+  case FIXNUM:
+    return (obj1->data.fixnum.value ==
+            obj2->data.fixnum.value);
+    break;
+  case CHARACTER:
+    return (obj1->data.character.value ==
+            obj2->data.character.value);
+    break;
+  case STRING:
+    return (strcmp(obj1->data.string.value,
+                   obj2->data.string.value) == 0);
+    break;
+  default:
+    return (obj1 == obj2);
+    break;
+  }
+}
+
 object *is_eq_proc(object *args) {
   object *obj1, *obj2;
 
   obj1 = car(args);
-  obj2 = cdr(args);
+  obj2 = cadr(args);
 
-  if(obj1->type != obj2->type)
-    return false;
-  switch (obj1->type) {
-  case FIXNUM:
-    return (obj1->data.fixnum.value ==
-            obj2->data.fixnum.value) ? true : false;
-    break;
-  case CHARACTER:
-    return (obj1->data.character.value ==
-            obj2->data.character.value) ? true : false;
-    break;
-  case STRING:
-    return (strcmp(obj1->data.string.value,
-                   obj2->data.string.value) == 0) ?
-      true : false;
-    break;
-  default:
-    return (obj1 == obj2) ? true : false;
-    break;
+  return is_eq(obj1, obj2) ? true : false;
+}
+
+object *reverse(object *head) {
+  object *new_head = nil;
+  while(!is_nil(head)) {
+    new_head = cons(car(head), new_head);
+    head = cdr(head);
   }
+  return new_head;
+}
+
+object *reverse_proc(object *args) {
+  return reverse(car(args));
 }
 
 object *make_compound_proc(object *params,
@@ -614,6 +631,7 @@ void init() {
 
   symbol_table = nil;
   keyword_table = nil;
+  
   quote_symbol = make_symbol("quote");
   backquote_symbol = make_symbol("backquote");
   comma_symbol = make_symbol("comma");
@@ -624,9 +642,14 @@ void init() {
   lambda_symbol = make_symbol("lambda");
   begin_symbol = make_symbol("begin");
   macro_symbol = make_symbol("macro");
+  rest_keyword = make_keyword(":rest");
 
   the_empty_environment = nil;
   the_global_environment = setup_environment();
+
+  define_variable(make_symbol("nil"),
+                  nil,
+                  the_global_environment);
 
   //define_variable(make_symbol("+"),
   //                make_primitive_proc(add_proc),
@@ -664,6 +687,7 @@ void init() {
   add_procedure("set-cdr!", set_cdr_proc);
   add_procedure("list", list_proc);
   add_procedure("len", len_proc);
+  add_procedure("reverse", reverse_proc);
 
   add_procedure("eq?", is_eq_proc);
   //add_procedure("macroexpand-f", macroexpand_proc);
@@ -1095,16 +1119,50 @@ object *list_of_values(object *exps, object *env) {
   }
 }
 
+object *parse_args(object *args, object *params) {
+  object *arg_iterator = args;
+  object *param_iterator = params;
+  
+  // fix the args
+  while(!is_nil(cdr(param_iterator))) {
+    if (is_eq(cadr(param_iterator), rest_keyword)) {
+      cdr(arg_iterator) = cons(cdr(arg_iterator), nil);
+      break;
+    }
+    arg_iterator = cdr(arg_iterator);
+    param_iterator = cdr(param_iterator);
+  }
+  return args;
+}
+
+object *parse_params(object *params) {
+  object *param_iterator, *cleaned_params;
+
+  // fix the params
+  param_iterator = params;
+  cleaned_params = nil;
+  while(!is_nil(param_iterator)) {
+    if(!is_eq(car(param_iterator),rest_keyword))
+      cleaned_params = cons(car(param_iterator),cleaned_params);
+    param_iterator = cdr(param_iterator);
+  }
+  return reverse(cleaned_params);
+}
+
 object *apply(object *proc, object *args) {
   object *exp;
+  object *parsed_args;
+  object *parsed_params;
   if (is_primitive_proc(proc))
     return (proc->data.primitive_proc.fn)(args);
   else if (is_compound_proc(proc)) {
+    parsed_args = parse_args(args, proc->data.compound_proc.parameters);
+    parsed_params = parse_params(proc->data.compound_proc.parameters);
     exp = proc->data.compound_proc.body;
     return eval_sequence(exp,
                          extend_environment(
-                           proc->data.compound_proc.parameters,
-                           args,
+                           parsed_params,
+                           parsed_args,
                            proc->data.compound_proc.env));
   }
   else {
@@ -1115,34 +1173,17 @@ object *apply(object *proc, object *args) {
 object *macroexpand(object *proc, object *args) {
   object *body;
   object *expanded_body;
-  object *arg_iterator;
-  object *prev_tail;
-  long n_params;
-  long n_args;
+  object *parsed_params;
+  object *parsed_args;
+  
   if(is_macro(proc)) {
-    //n_params = len(proc->data.macro.parameters);
-    //n_args = len(args);
-    //if (n_args < n_params) {
-    //  fprintf(stderr, "Too few args to macro call.\n");
-    //  exit(1);
-    //}
-    //// make the last arg a list if there are too many
-    //if (n_args > n_params) {
-    //  arg_iterator = args;
-    //  // this catches last arg as well as extras
-    //  while (n_args > (n_params + 2)) { 
-    //    arg_iterator = cdr(arg_iterator);
-    //    n_args--;
-    //  }
-    //  prev_tail = arg_iterator;
-    //  //prev_tail->data.cons.rest = cons(cdr(arg_iterator), nil);
-    //  cdr(prev_tail) = cons(cdr(arg_iterator), nil);
-    //}
+    parsed_args = parse_args(args, proc->data.macro.parameters);
+    parsed_params = parse_params(proc->data.macro.parameters);
     body = proc->data.macro.body;
     expanded_body = eval_sequence(body,
                                   extend_environment(
-                                    proc->data.macro.parameters,
-                                    args,
+                                    parsed_params,
+                                    parsed_args,
                                     proc->data.macro.env));
   }
   else {
