@@ -10,7 +10,7 @@
 /* language */
 /************/
 
-typedef enum {NIL, BOOLEAN, SYMBOL, FIXNUM, CHARACTER, STRING, CONS, MACRO, PRIMITIVE_PROC, COMPOUND_PROC} object_type;
+typedef enum {NIL, BOOLEAN, SYMBOL, KEYWORD, FIXNUM, CHARACTER, STRING, CONS, MACRO, PRIMITIVE_PROC, COMPOUND_PROC} object_type;
 
 typedef struct object {
   object_type type;
@@ -21,6 +21,9 @@ typedef struct object {
     struct {
       char *value;
     } symbol;
+    struct {
+      char *value;
+    } keyword;
     struct {
       long value;
     } fixnum;
@@ -62,6 +65,7 @@ object *nil;
 object *false;
 object *true;
 object *symbol_table;
+object *keyword_table;
 object *quote_symbol;
 object *backquote_symbol;
 object *comma_symbol;
@@ -128,8 +132,35 @@ object *make_symbol(char *value) {
   return obj;
 }
 
+object *make_keyword(char *value) {
+  object *obj;
+  object *element;
+
+  // search
+  element = keyword_table;
+  while(!is_nil(element)) {
+    if (strcmp(car(element)->data.keyword.value, value) == 0)
+      return car(element);
+    element = cdr(element);
+  }
+
+  // if not found, create
+  obj = alloc_object();
+  obj->type = KEYWORD;
+  obj->data.keyword.value = (char *) malloc(strlen(value) + 1);
+  if(!obj->data.keyword.value)
+    return 0;
+  strcpy(obj->data.keyword.value, value);
+  keyword_table = cons(obj, keyword_table);
+  return obj;
+}
+
 char is_symbol(object *obj) {
   return obj->type == SYMBOL;
+}
+
+char is_keyword(object *obj) {
+  return obj->type == KEYWORD;
 }
 
 object *make_fixnum(long value) {
@@ -228,6 +259,10 @@ object *is_boolean_proc(object *args) {
 
 object *is_symbol_proc(object *args) {
   return is_symbol(car(args)) ? true : false;
+}
+
+object *is_keyword_proc(object *args) {
+  return is_keyword(car(args)) ? true : false;
 }
 
 object *is_integer_proc(object *args) {
@@ -578,6 +613,7 @@ void init() {
   true->data.boolean.value = 1;
 
   symbol_table = nil;
+  keyword_table = nil;
   quote_symbol = make_symbol("quote");
   backquote_symbol = make_symbol("backquote");
   comma_symbol = make_symbol("comma");
@@ -599,6 +635,7 @@ void init() {
   add_procedure("nil?"       , is_null_proc      );
   add_procedure("boolean?"   , is_boolean_proc   );
   add_procedure("symbol?"    , is_symbol_proc    );
+  add_procedure("keyword?"   , is_keyword_proc   );
   add_procedure("integer?"   , is_integer_proc   );
   add_procedure("char?"      , is_char_proc      );
   add_procedure("string?"    , is_string_proc    );
@@ -786,6 +823,29 @@ object *read(FILE *in) {
       exit(1);
     }
   }
+  //read a keyword
+  else if(c == ':') {
+    i = 0;
+    while (c == ':' || is_initial(c) || isdigit(c) || c == '+' || c == '-') {
+      if (i < BUFFER_MAX - 1) {
+        buffer[i++] = c;
+      }
+      else {
+        fprintf(stderr, "Keyword too long; max length is %d.\n", BUFFER_MAX);
+        exit(1);
+      }
+      c = getc(in);
+    }
+    if( is_delimiter(c) ) {
+      buffer[i] = '\0';
+      ungetc(c, in);
+      return make_keyword(buffer);
+    }
+    else {
+      fprintf(stderr, "Keyword not followed by delimiter; found '%c'.\n", c);
+      exit(1);
+    }
+  }
   //read a symbol
   else if (is_initial(c) || ((c == '+' || c == '-') &&
                              is_delimiter(peek(in)))) {
@@ -866,7 +926,7 @@ object *read(FILE *in) {
 /********/
 
 char is_self_evaluating(object *obj) {
-  return is_boolean(obj) || is_fixnum(obj) || is_character(obj) || is_string(obj);
+  return is_keyword(obj) || is_boolean(obj) || is_fixnum(obj) || is_character(obj) || is_string(obj);
 }
 
 char is_variable(object *exp) {
@@ -1261,6 +1321,9 @@ void write(object *obj) {
     break;
   case SYMBOL:
     printf("%s",obj->data.symbol.value);
+    break;
+  case KEYWORD:
+    printf("%s", obj->data.keyword.value);
     break;
   case FIXNUM:
     printf("%ld",obj->data.fixnum.value);
