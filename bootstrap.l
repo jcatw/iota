@@ -7,9 +7,10 @@
   (if (null? l) '()
       (cons (f (car l)) (map f (cdr l)))))
 
-;(define let
-;  (macro (assignments body)
-;    ((lambda (map car assignments) body)
-;     (map cadr assignments))))
+(define let
+  (macro (assignments body)
+    `((lambda ,(map car assignments)
+	,@body)
+      ,@(map cadr assignments))))
 
 "End bootstrap.l"

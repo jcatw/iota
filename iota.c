@@ -65,6 +65,7 @@ object *symbol_table;
 object *quote_symbol;
 object *backquote_symbol;
 object *comma_symbol;
+object *comma_at_symbol;
 object *define_symbol;
 object *set_symbol;
 object *if_symbol;
@@ -88,7 +89,7 @@ object *cons(object *first, object *rest);
 #define caddr(X) (car(cdr(cdr(X))))
 #define cadddr(X) (car(cdr(cdr(cdr(X)))))
 #define caadr(X) (car(car(cdr(X))))
-
+  
 char is_nil(object *obj) {
   return obj->type == NIL;
 }
@@ -189,6 +190,21 @@ char is_cons(object *obj) {
   return obj->type == CONS;
 }
 
+// get length of list
+// linear time! use sparingly.
+long len(object *obj) {
+  int l = 0;
+  if(!obj->type == CONS)
+    return 1;
+  else {
+    while(!is_nil(obj)) {
+      l++;
+      obj = cdr(obj);
+    }
+    return l;
+  }
+}
+    
 object *make_primitive_proc(object *(*fn)(struct object *args)) {
   object *obj;
 
@@ -283,19 +299,6 @@ object *symbol_to_string_proc(object *args) {
 object *string_to_symbol_proc(object *args) {
   return make_symbol(car(args)->data.string.value);
 }
-
-//#define arithmetic_proc_maker(name,op)          \
-//  object *name ## _proc(object *args) {           \
-//    long result = 0;                              \
-//    while(!is_nil(args)) {                        \
-//      result op ## = (car(args))->data.fixnum.value;        \
-//      args = cdr(args); \                                   
-//    }                                               \
-//    return make_fixnum(result); \
-//  }
-//
-//arithmetic_proc_maker(add,+)
-//arithmetic_proc_maker
 
 object *add_proc(object *args) {
   long result = 0;
@@ -402,6 +405,10 @@ object *set_cdr_proc(object *args) {
 
 object *list_proc(object *args) {
   return args;
+}
+
+object *len_proc(object *args) {
+  return make_fixnum(len(car(args)));
 }
 
 object *is_eq_proc(object *args) {
@@ -556,6 +563,8 @@ object *setup_environment() {
                   make_primitive_proc(c_name),  \
                   the_global_environment);
 
+object *macroexpand_proc(object *exps);
+
 void init() {
   nil = alloc_object();
   nil->type = NIL;
@@ -572,6 +581,7 @@ void init() {
   quote_symbol = make_symbol("quote");
   backquote_symbol = make_symbol("backquote");
   comma_symbol = make_symbol("comma");
+  comma_at_symbol = make_symbol("comma-at");
   define_symbol = make_symbol("define");
   set_symbol = make_symbol("set!");
   if_symbol = make_symbol("if");
@@ -616,8 +626,10 @@ void init() {
   add_procedure("set-car!", set_car_proc);
   add_procedure("set-cdr!", set_cdr_proc);
   add_procedure("list", list_proc);
+  add_procedure("len", len_proc);
 
   add_procedure("eq?", is_eq_proc);
+  //add_procedure("macroexpand-f", macroexpand_proc);
 }
 
 /********/
@@ -836,7 +848,12 @@ object *read(FILE *in) {
   }
   // read an escaped (comma'd) expression
   else if(c == ',') {
-    return cons(comma_symbol, cons(read(in), nil));
+    if(peek(in) == '@') {
+      c = getc(in);
+      return cons(comma_at_symbol, cons(read(in), nil));
+    }
+    else
+      return cons(comma_symbol, cons(read(in), nil));
   }
   else {
     fprintf(stderr, "Bad input: unexpected '%c'\n", c);
@@ -1035,23 +1052,56 @@ object *apply(object *proc, object *args) {
     exit(1);
   }
 }
-
-object *apply_macro(object *proc, object *args, object *env) {
+object *macroexpand(object *proc, object *args) {
   object *body;
   object *expanded_body;
+  object *arg_iterator;
+  object *prev_tail;
+  long n_params;
+  long n_args;
   if(is_macro(proc)) {
+    //n_params = len(proc->data.macro.parameters);
+    //n_args = len(args);
+    //if (n_args < n_params) {
+    //  fprintf(stderr, "Too few args to macro call.\n");
+    //  exit(1);
+    //}
+    //// make the last arg a list if there are too many
+    //if (n_args > n_params) {
+    //  arg_iterator = args;
+    //  // this catches last arg as well as extras
+    //  while (n_args > (n_params + 2)) { 
+    //    arg_iterator = cdr(arg_iterator);
+    //    n_args--;
+    //  }
+    //  prev_tail = arg_iterator;
+    //  //prev_tail->data.cons.rest = cons(cdr(arg_iterator), nil);
+    //  cdr(prev_tail) = cons(cdr(arg_iterator), nil);
+    //}
     body = proc->data.macro.body;
     expanded_body = eval_sequence(body,
                                   extend_environment(
                                     proc->data.macro.parameters,
                                     args,
                                     proc->data.macro.env));
-    return eval(expanded_body, env);
   }
   else {
-    fprintf(stderr, "Tried to apply non-macro as macro.\n");
+    fprintf(stderr, "Macro not found.\n");
     exit(1);
   }
+    
+  return expanded_body;
+}
+
+//object *macroexpand_proc(object *exps) {
+//  object *proc = eval(car(exps), the_global_environment);
+//  object *args = cadr(exps);
+//  return macroexpand(proc, args);
+//}
+
+object *apply_macro(object *proc, object *args, object *env) {
+  object *expanded_body = macroexpand(proc, args);
+  return eval(expanded_body, env);
 }
 
 object *eval_assignment(object *exp, object *env) {
@@ -1078,13 +1128,45 @@ char is_escaped(object *exp) {
   return is_tagged_list(exp, comma_symbol);
 }
 
+char is_spliced(object *exp) {
+  return is_tagged_list(exp, comma_at_symbol);
+}
+
+object *eval_sequence_head(object *exp, object *env) {
+  object *head = cons(eval(car(exp), env), nil);
+  object *this = head;
+  object *next;
+  exp = cdr(exp);
+  while(!is_nil(exp)) {
+    next = cons(eval(car(exp), env), nil);
+    this->data.cons.rest = next;
+    this = next;
+    exp = cdr(exp);
+  }
+  return cons(head,this);
+}
+
 object *eval_backquoted(object *exp, object *env) {
+  object *head;
+  object *this;
+  object *cdr_eval;
   if(is_escaped(exp)) {
     return eval(text_of_quotation(exp), env);
   }
   else if(is_cons(exp)) {
-    return cons(eval_backquoted(car(exp), env),
-                eval_backquoted(cdr(exp), env));
+    if (is_spliced(car(exp))) {
+      head = eval(text_of_quotation(car(exp)), env);
+      this = head;
+      while(!is_nil(cdr(this)))
+        this = cdr(this);
+      cdr_eval = eval_backquoted(cdr(exp), env);
+      cdr(this) = cdr_eval;
+      return head;
+    }
+    else {
+      return cons(eval_backquoted(car(exp), env),
+                  eval_backquoted(cdr(exp), env));
+    }
   }
   else {
     return exp;

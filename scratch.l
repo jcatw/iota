@@ -18,3 +18,6 @@
 ;;    (if (null? l) '()
 ;;      (cons (f (car l)) (mapper (cdr l)))))
 ;;  (mapper l))
+
+;;(define (macroexpand form)
+;;  `,(macroexpand-f `,form)
