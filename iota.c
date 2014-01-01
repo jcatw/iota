@@ -1124,15 +1124,24 @@ object *parse_args(object *args, object *params) {
   object *param_iterator = params;
   
   // fix the args
-  while(!is_nil(cdr(param_iterator))) {
-    if (is_eq(cadr(param_iterator), rest_keyword)) {
-      cdr(arg_iterator) = cons(cdr(arg_iterator), nil);
-      break;
-    }
-    arg_iterator = cdr(arg_iterator);
-    param_iterator = cdr(param_iterator);
+  if(is_nil(args)) {
+    return args;
   }
-  return args;
+  else if( is_eq(car(params), rest_keyword) ) {
+    return cons(args, nil);
+    //return args;
+  }
+  else {
+    while(!is_nil(cdr(param_iterator))) {
+      if (is_eq(cadr(param_iterator), rest_keyword)) {
+        cdr(arg_iterator) = cons(cdr(arg_iterator), nil);
+        break;
+      }
+      arg_iterator = cdr(arg_iterator);
+      param_iterator = cdr(param_iterator);
+    }
+    return args;
+  }
 }
 
 object *parse_params(object *params) {

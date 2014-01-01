@@ -1,17 +1,4 @@
-;;(define (make-if predicate consequent alternative)
-;;  (list 'if predicate consequent alternative))
-;;(define (cond? exp) (tagged-list? exp 'cond))
-;;(define (cond-clauses exp) (cdr exp))
-;;(define (cond-predicate clause) (car clause))
-;;(define (cond-else-clause? clause)
-;;  (eq? (cond-predicate clause) 'else))
-;;(define (cond-actions clause) (car clause))
-;;(define (cond->if exp) (expand-clauses (cond-clauses exp)))
-;;(define (expand-clauses clauses)
-;;  (if (null? clauses) #f
-;;      (if (cond-else-clause? (car clauses))
-;;	  (if (null? (cdr clauses))
-;;	      (sequence->exp (cond-actions (car clauses)))))))
+
 ;;(begin 1 2 3)
 ;;(define (map f l)
 ;;  (define (mapper l)
