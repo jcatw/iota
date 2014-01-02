@@ -1132,6 +1132,7 @@ object *copy_list(object *list) {
   return reverse(new_list);
 }
 
+// warning - this is likely broken
 object *parse_args(object *args, object *params) {
   object *args_copy = copy_list(args);
   object *arg_iterator = args_copy;
@@ -1179,8 +1180,11 @@ object *apply(object *proc, object *args) {
   if (is_primitive_proc(proc))
     return (proc->data.primitive_proc.fn)(args);
   else if (is_compound_proc(proc)) {
-    parsed_args = parse_args(args, proc->data.compound_proc.parameters);
-    parsed_params = parse_params(proc->data.compound_proc.parameters);
+    //parsed_args = parse_args(args, proc->data.compound_proc.parameters);
+    //parsed_params = parse_params(proc->data.compound_proc.parameters);
+    // for now, do not parse
+    parsed_args = args;
+    parsed_params = proc->data.compound_proc.parameters;
     exp = proc->data.compound_proc.body;
     return eval_sequence(exp,
                          extend_environment(
@@ -1200,8 +1204,12 @@ object *macroexpand(object *proc, object *args) {
   object *parsed_args;
   
   if(is_macro(proc)) {
-    parsed_args = parse_args(args, proc->data.macro.parameters);
-    parsed_params = parse_params(proc->data.macro.parameters);
+    //parsed_args = parse_args(args, proc->data.macro.parameters);
+    //parsed_params = parse_params(proc->data.macro.parameters);
+
+    // for now, do not parse
+    parsed_args = args;
+    parsed_params = proc->data.macro.parameters;
     body = proc->data.macro.body;
     expanded_body = eval_sequence(body,
                                   extend_environment(

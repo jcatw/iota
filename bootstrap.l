@@ -7,12 +7,6 @@
   (if (null? l) '()
       (cons (f (car l)) (map f (cdr l)))))
 
-(define let
-  (macro (assignments :rest body)
-    `((lambda ,(map car assignments)
-	,@body)
-      ,@(map cadr assignments))))
-
 (define (make-begin seq)
   (cons 'begin seq))
 
@@ -39,15 +33,5 @@
 	    (make-if (cond-predicate first)
 		     (sequence->exp (cond-actions first))
 		     (expand-clauses rest))))))
-(define cond
-  (macro (:rest clauses) (expand-clauses clauses)))
-
-(define rester
-  (macro (:rest clauses) `,clauses))
-
-(define rester2
-  (macro (clauses) `,clauses))
-
-(define (rester3 :rest clauses) clauses)
 
 "End bootstrap.l"
