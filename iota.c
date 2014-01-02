@@ -1132,9 +1132,9 @@ object *copy_list(object *list) {
   return reverse(new_list);
 }
 
-// warning - this is likely broken
 object *parse_args(object *args, object *params) {
-  object *args_copy = copy_list(args);
+  //object *args_copy = copy_list(args);
+  object *args_copy = args;
   object *arg_iterator = args_copy;
   object *param_iterator = params;
   
@@ -1143,6 +1143,8 @@ object *parse_args(object *args, object *params) {
     return args_copy;
   }
   else if( is_eq(car(params), rest_keyword) ) {
+    //return cons(cons(quote_symbol, cons(args_copy, nil)),nil);
+    //return cons(quote_symbol, cons(args_copy, nil));
     return cons(args_copy, nil);
     //return args_copy;
   }
@@ -1150,6 +1152,8 @@ object *parse_args(object *args, object *params) {
     while(!is_nil(cdr(param_iterator))) {
       if (is_eq(cadr(param_iterator), rest_keyword)) {
         cdr(arg_iterator) = cons(cdr(arg_iterator), nil);
+        //cdr(arg_iterator) = cons(quote_symbol, cons(cdr(arg_iterator), nil));
+        //cdr(arg_iterator) = cons(cons(quote_symbol, cons(cdr(arg_iterator), nil)),nil);
         break;
       }
       arg_iterator = cdr(arg_iterator);
@@ -1180,11 +1184,12 @@ object *apply(object *proc, object *args) {
   if (is_primitive_proc(proc))
     return (proc->data.primitive_proc.fn)(args);
   else if (is_compound_proc(proc)) {
-    //parsed_args = parse_args(args, proc->data.compound_proc.parameters);
-    //parsed_params = parse_params(proc->data.compound_proc.parameters);
-    // for now, do not parse
-    parsed_args = args;
-    parsed_params = proc->data.compound_proc.parameters;
+    // do parse
+    parsed_args = parse_args(args, proc->data.compound_proc.parameters);
+    parsed_params = parse_params(proc->data.compound_proc.parameters);
+    // do not parse
+    //parsed_args = args;
+    //parsed_params = proc->data.compound_proc.parameters;
     exp = proc->data.compound_proc.body;
     return eval_sequence(exp,
                          extend_environment(
@@ -1204,12 +1209,12 @@ object *macroexpand(object *proc, object *args) {
   object *parsed_args;
   
   if(is_macro(proc)) {
-    //parsed_args = parse_args(args, proc->data.macro.parameters);
-    //parsed_params = parse_params(proc->data.macro.parameters);
-
-    // for now, do not parse
-    parsed_args = args;
-    parsed_params = proc->data.macro.parameters;
+    //do parse
+    parsed_args = parse_args(args, proc->data.macro.parameters);
+    parsed_params = parse_params(proc->data.macro.parameters);
+    // do not parse
+    //parsed_args = args;
+    //parsed_params = proc->data.macro.parameters;
     body = proc->data.macro.body;
     expanded_body = eval_sequence(body,
                                   extend_environment(
