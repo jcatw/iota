@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -222,6 +223,10 @@ char is_cons(object *obj) {
   return obj->type == CONS;
 }
 
+char is_list(object *obj) {
+  return obj->type == CONS || obj->type == NIL;
+}
+
 // get length of list
 // linear time! use sparingly.
 long len(object *obj) {
@@ -251,38 +256,47 @@ char is_primitive_proc(object *obj) {
 }
 
 object *is_null_proc(object *args) {
+  assert( is_list(args) );
   return is_nil(car(args)) ? true : false;
 }
 
 object *is_boolean_proc(object *args) {
+  assert( is_list(args) );
   return is_boolean(car(args)) ? true : false;
 }
 
 object *is_symbol_proc(object *args) {
+  assert( is_list(args) );
   return is_symbol(car(args)) ? true : false;
 }
 
 object *is_keyword_proc(object *args) {
+  assert( is_list(args) );
   return is_keyword(car(args)) ? true : false;
 }
 
 object *is_integer_proc(object *args) {
+  assert( is_list(args) );
   return is_fixnum(car(args)) ? true : false;
 }
 
 object *is_char_proc(object *args) {
+  assert( is_list(args) );
   return is_character(car(args)) ? true : false;
 }
 
 object *is_string_proc(object *args) {
+  assert( is_list(args) );
   return is_string(car(args)) ? true : false;
 }
 
 object *is_cons_proc(object *args) {
+  assert( is_list(args) );
   return is_cons(car(args)) ? true : false;
 }
 
 object *is_procedure_proc(object *args) {
+  assert( is_list(args) );
   return is_primitive_proc(car(args)) ? true : false;
 }
 
@@ -297,6 +311,7 @@ char is_tagged_list(object *expression, object *tag) {
 }
 
 object *is_tagged_list_proc(object *args) {
+  assert( is_list(args) );
   object *exp, *tag;
   exp = car(args);
   tag = cadr(args);
@@ -305,14 +320,17 @@ object *is_tagged_list_proc(object *args) {
 }
 
 object *char_to_integer_proc(object *args) {
+  assert( is_list(args) );
   return make_fixnum(car(args)->data.character.value);
 }
 
 object *integer_to_char_proc(object *args) {
+  assert( is_list(args) );
   return make_character(car(args)->data.fixnum.value);
 }
 
 object *number_to_string_proc(object *args) {
+  assert( is_list(args) );
   char buffer[128];
 
   sprintf(buffer, "%ld", car(args)->data.fixnum.value);
@@ -320,6 +338,7 @@ object *number_to_string_proc(object *args) {
 }
 
 object *string_to_number_proc(object *args) {
+  assert( is_list(args) );
   long num = 0;
   char *cptr = car(args)->data.string.value;
 
@@ -329,14 +348,17 @@ object *string_to_number_proc(object *args) {
 }
 
 object *symbol_to_string_proc(object *args) {
+  assert( is_list(args) );
   return make_string(car(args)->data.symbol.value);
 }
 
 object *string_to_symbol_proc(object *args) {
+ assert( is_list(args) );
   return make_symbol(car(args)->data.string.value);
 }
 
 object *add_proc(object *args) {
+  assert( is_list(args) );
   long result = 0;
 
   while (!is_nil(args)) {
@@ -347,6 +369,7 @@ object *add_proc(object *args) {
 }
 
 object *subtract_proc(object *args) {
+  assert( is_list(args) );
   long result = car(args)->data.fixnum.value;
   args = cdr(args);
 
@@ -358,6 +381,7 @@ object *subtract_proc(object *args) {
 }
 
 object *multiply_proc(object *args) {
+  assert( is_list(args) );
   long result = 1;
 
   while(!is_nil(args)) {
@@ -368,6 +392,7 @@ object *multiply_proc(object *args) {
 }
 
 object *divide_proc(object *args) {
+  assert( is_list(args) );
   long result = car(args)->data.fixnum.value;
   args = cdr(args);
 
@@ -379,6 +404,7 @@ object *divide_proc(object *args) {
 }
 
 object *is_equal_proc(object *args) {
+  assert( is_list(args) );
   long value;
 
   value = car(args)->data.fixnum.value;
@@ -390,6 +416,7 @@ object *is_equal_proc(object *args) {
 }
 
 object *is_less_than_proc(object *args) {
+  assert( is_list(args) );
   long previous, next;
 
   previous = car(args)->data.fixnum.value;
@@ -404,6 +431,7 @@ object *is_less_than_proc(object *args) {
 }
 
 object *is_greater_than_proc(object *args) {
+  assert( is_list(args) );
   long previous, next;
 
   previous = car(args)->data.fixnum.value;
@@ -418,32 +446,39 @@ object *is_greater_than_proc(object *args) {
 }
 
 object *cons_proc(object *args) {
+  assert( is_list(args) );
   return cons(car(args), cadr(args));
 }
 
 object *car_proc(object *args) {
+  assert( is_list(args) );
   return caar(args);
 }
 
 object *cdr_proc(object *args) {
+  assert( is_list(args) );
   return cdar(args);
 }
 
 object *set_car_proc(object *args) {
+  assert( is_list(args) );
   car(car(args)) = cadr(args);
   return cadr(args);
 }
 
 object *set_cdr_proc(object *args) {
+  assert( is_list(args) );
   cdr(car(args)) = cadr(args);
   return cadr(args);
 }
 
 object *list_proc(object *args) {
+  assert( is_list(args) );
   return args;
 }
 
 object *len_proc(object *args) {
+  assert( is_list(args) );
   return make_fixnum(len(car(args)));
 }
 
@@ -470,6 +505,7 @@ char is_eq(object *obj1, object *obj2) {
 }
 
 object *is_eq_proc(object *args) {
+  assert( is_list(args) );
   object *obj1, *obj2;
 
   obj1 = car(args);
@@ -479,6 +515,7 @@ object *is_eq_proc(object *args) {
 }
 
 object *reverse(object *head) {
+  assert( is_list(head) );
   object *new_head = nil;
   while(!is_nil(head)) {
     new_head = cons(car(head), new_head);
@@ -488,6 +525,7 @@ object *reverse(object *head) {
 }
 
 object *reverse_proc(object *args) {
+  assert( is_list(args) );
   return reverse(car(args));
 }
 
@@ -510,10 +548,12 @@ char is_compound_proc(object *obj) {
 }
   
 object *enclosing_environment(object *env) {
+  assert( is_list(env) );
   return cdr(env);
 }
 
 object *first_frame(object *env) {
+  assert( is_list(env) );
   return car(env);
 }
 
@@ -522,10 +562,12 @@ object *make_frame(object *variables, object *values) {
 }
 
 object *frame_variables(object *frame) {
+  assert( is_list(frame) );
   return car(frame);
 }
 
 object *frame_values(object *frame) {
+  assert( is_list(frame) );
   return cdr(frame);
 }
 
@@ -539,10 +581,12 @@ void add_binding_to_frame(object *var,
 object *extend_environment(object *vars,
                            object *vals,
                            object *base_env) {
+  assert( is_list(base_env) );
   return cons(make_frame(vars, vals), base_env); 
 }
 
 object *lookup_variable_value(object *var, object *env) {
+  assert( is_list(env) );
   object *frame, *vars, *vals;
   while(!is_nil(env)) {
     frame = first_frame(env);
@@ -563,6 +607,7 @@ object *lookup_variable_value(object *var, object *env) {
 void set_variable_value(object *var,
                         object *val,
                         object *env) {
+  assert( is_list(env)  );
   object *frame, *vars, *vals;
   while(!is_nil(env)) {
     frame = first_frame(env);
@@ -585,6 +630,7 @@ void set_variable_value(object *var,
 void define_variable(object *var,
                      object *val,
                      object *env) {
+  assert( is_list(env) );
   object *frame, *vars, *vals;
   frame = first_frame(env);
   vars = frame_variables(frame);
@@ -650,7 +696,7 @@ void init() {
   define_variable(make_symbol("nil"),
                   nil,
                   the_global_environment);
-
+  
   //define_variable(make_symbol("+"),
   //                make_primitive_proc(add_proc),
   //                the_global_environment);
@@ -962,6 +1008,7 @@ char is_quoted(object *expression) {
 }
 
 object *text_of_quotation(object *expression) {
+  assert( is_list(expression) );
   return cadr(expression);
 }
 
@@ -970,11 +1017,13 @@ char is_assignment(object *exp) {
 }
 
 object *assignment_variable(object *exp) {
+  assert( is_list(exp) );
   //return car(cdr(exp));
   return cadr(exp);
 }
 
 object *assignment_value(object *exp) {
+  assert( is_list(exp) );
   //return car(cdr(cdr(exp)));
   return caddr(exp);
 }
@@ -984,6 +1033,7 @@ char is_definition(object *exp) {
 }
 
 object *definition_variable(object *exp) {
+  assert( is_list(exp) );
   //return cadr(exp);
   if (is_symbol(cadr(exp)))
     return cadr(exp);
@@ -994,6 +1044,7 @@ object *definition_variable(object *exp) {
 object *make_lambda(object *params, object *body);
 
 object *definition_value(object *exp) {
+  assert( is_list(exp) );
   //return caddr(exp);
   if(is_symbol(cadr(exp)))
     return caddr(exp);
@@ -1008,14 +1059,17 @@ char is_if(object *exp) {
 }
 
 object *if_predicate(object *exp) {
+  assert( is_list(exp) );
   return cadr(exp);
 }
 
 object *if_consequent(object *exp) {
+  assert( is_list(exp) );
   return caddr(exp);
 }
 
 object *if_alternative(object *exp) {
+  assert( is_list(exp) );
   if (is_nil(cdddr(exp)))
     return false;
   return cadddr(exp);
@@ -1030,10 +1084,12 @@ char is_lambda(object *exp) {
 }
 
 object *lambda_parameters(object *exp) {
+  assert( is_list(exp) );
   return cadr(exp);
 }
 
 object *lambda_body(object *exp) {
+  assert( is_list(exp) );
   return cddr(exp);
 }
 
@@ -1069,10 +1125,12 @@ char is_begin(object *exp) {
 }
 
 object *begin_actions(object *exp) {
+  assert( is_list(exp) );
   return cdr(exp);
 }
 
 char is_last_exp(object *exps) {
+  assert( is_list(exps) );
   return is_nil(cdr(exps));
 }
 
@@ -1081,10 +1139,12 @@ char is_application(object *exp) {
 }
 
 object *operator(object *exp) {
+  assert( is_list(exp) );
   return car(exp);
 }
 
 object *operands(object *exp) {
+  assert( is_list(exp) );
   return cdr(exp);
 }
 
@@ -1093,15 +1153,18 @@ char is_no_operands(object *ops) {
 }
 
 object *first_operand(object *ops) {
+  assert( is_list(ops) );
   return car(ops);
 }
 
 object *rest_operands(object *ops) {
+  assert( is_list(ops) );
   return cdr(ops);
 }
 
 object *eval(object *exp, object *env);
 object *eval_sequence(object *exps, object *env) {
+  assert( is_list(exps) );
   while(!is_last_exp(exps)) {
     eval(car(exps), env);
     exps = cdr(exps);
@@ -1110,6 +1173,7 @@ object *eval_sequence(object *exps, object *env) {
 }
 
 object *list_of_values(object *exps, object *env) {
+  assert( is_list(exps) );
   if (is_no_operands(exps)) {
     return nil;
   }
@@ -1120,6 +1184,7 @@ object *list_of_values(object *exps, object *env) {
 }
 
 object *copy_list(object *list) {
+  assert( is_list(list) );
   object *iterator;
   object *new_list;
 
@@ -1133,6 +1198,8 @@ object *copy_list(object *list) {
 }
 
 object *parse_args(object *args, object *params) {
+  assert( is_list(args) );
+  assert( is_list(params) );
   //object *args_copy = copy_list(args);
   object *args_copy = args;
   object *arg_iterator = args_copy;
@@ -1164,6 +1231,7 @@ object *parse_args(object *args, object *params) {
 }
 
 object *parse_params(object *params) {
+  assert( is_list(params) );
   object *param_iterator, *cleaned_params;
 
   // fix the params
@@ -1178,6 +1246,7 @@ object *parse_params(object *params) {
 }
 
 object *apply(object *proc, object *args) {
+  assert( is_list(args) );
   object *exp;
   object *parsed_args;
   object *parsed_params;
@@ -1203,6 +1272,7 @@ object *apply(object *proc, object *args) {
   }
 }
 object *macroexpand(object *proc, object *args) {
+  assert( is_list(args) );
   object *body;
   object *expanded_body;
   object *parsed_params;
@@ -1237,6 +1307,7 @@ object *macroexpand(object *proc, object *args) {
 //}
 
 object *apply_macro(object *proc, object *args, object *env) {
+  assert( is_list(args) );
   object *expanded_body = macroexpand(proc, args);
   return eval(expanded_body, env);
 }
@@ -1270,6 +1341,7 @@ char is_spliced(object *exp) {
 }
 
 object *eval_sequence_head(object *exp, object *env) {
+  assert( is_list(exp) );
   object *head = cons(eval(car(exp), env), nil);
   object *this = head;
   object *next;
@@ -1284,6 +1356,7 @@ object *eval_sequence_head(object *exp, object *env) {
 }
 
 object *eval_backquoted(object *exp, object *env) {
+  object *thing_to_splice;
   object *head;
   object *this;
   object *cdr_eval;
@@ -1292,7 +1365,17 @@ object *eval_backquoted(object *exp, object *env) {
   }
   else if(is_cons(exp)) {
     if (is_spliced(car(exp))) {
-      head = eval(text_of_quotation(car(exp)), env);
+      thing_to_splice = text_of_quotation(car(exp));
+      head = eval(thing_to_splice, env);
+      if(is_nil(head)) {
+        fprintf(stderr, "Attempt to splice in nil.\n");
+        exit(1);
+      }
+      if(!is_cons(head)) {
+        printf("%d\n",thing_to_splice->type);
+        fprintf(stderr, "Attempt to splice in non-cons.\n");
+        exit(1);
+      }
       this = head;
       while(!is_nil(cdr(this)))
         this = cdr(this);
@@ -1375,6 +1458,7 @@ object *eval(object *exp, object *env) {
 void write(object *obj);
 
 void write_pair(object *cons) {
+  assert( is_list(cons) );
   write(car(cons));
   if((cdr(cons))->type == CONS) {
     printf(" ");

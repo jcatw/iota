@@ -24,10 +24,4 @@
 (define (make-if predicate consequent alternative)
   (list 'if predicate consequent alternative))
 
-(define cond
-  (macro (:rest clauses)
-    (let ((clause (car clauses))
-	  (other-clauses (cdr clauses)))
-      `(if ,@clause ,(cond other-clauses)))))
-
 "End bootstrap.l"

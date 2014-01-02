@@ -76,3 +76,63 @@
 (define cond
   (macro (:rest clauses)
     (expand-clauses clauses)))
+
+(define cond
+  (macro (:rest clauses)
+    (if (null? clauses) #f
+	(let ((clause (car clauses))
+	      (other-clauses (cdr clauses)))
+	  (if (null? other-clauses)
+	      `'hey
+	      `(if ,@clause (cond ,@other-clauses)))))))
+(define (cond-fn clauses)
+  (let ((clause (car clauses))
+	(other-clauses (cdr clauses)))
+    (if (null? other-clauses)
+	`(if ,@clause)
+	`(if ,@clause ,`(cond ,@other-clauses)))))
+
+(define cond
+  (macro (:rest x)
+    (cond-fn x)))
+
+(define cond
+  (macro (:rest clauses)
+    `(conder ,clauses)))
+(define conder
+  (macro (clauses)
+    (let ((clause (car clauses))
+	  (others (cdr clauses)))
+      (if (null? others)
+	  (list 'if (car clause) (cadr clause))
+	  (list 'if
+		(car clause)
+		(cadr clause)
+		(conder others))))))
+
+(define cond
+  (macro (:rest cond-pairs)
+    (if (null? cond-pairs)
+	nil
+	`(if ,(car (car cond-pairs))
+	     (begin ,@(cdr (car cond-pairs)))
+	     (cond ,@(cdr cond-pairs))))))
+
+(define cond
+  (macro (:rest cond-pairs)
+    (if (null? cond-pairs)
+	'()
+	(if (null? (cdr cond-pairs)
+		   `(if ,(car (car cond-pairs))
+			,(car (cdr (car cond-pairs))))
+		   `(if ,(car (car cond-pairs))
+			,(car (cdr (car cond-pairs)))
+			(cond ,@(cdr cond-pairs))))))))
+(define thing
+  (macro (:rest x)
+    `(car (car ,x))))
+	
+
+
+
+  
