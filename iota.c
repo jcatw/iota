@@ -1119,17 +1119,31 @@ object *list_of_values(object *exps, object *env) {
   }
 }
 
+object *copy_list(object *list) {
+  object *iterator;
+  object *new_list;
+
+  iterator = list;
+  new_list = nil;
+  while(!is_nil(iterator)) {
+    new_list = cons(car(list), new_list);
+    iterator = cdr(iterator);
+  }
+  return reverse(new_list);
+}
+
 object *parse_args(object *args, object *params) {
-  object *arg_iterator = args;
+  object *args_copy = copy_list(args);
+  object *arg_iterator = args_copy;
   object *param_iterator = params;
   
   // fix the args
-  if(is_nil(args)) {
-    return args;
+  if(is_nil(args_copy)) {
+    return args_copy;
   }
   else if( is_eq(car(params), rest_keyword) ) {
-    return cons(args, nil);
-    //return args;
+    return cons(args_copy, nil);
+    //return args_copy;
   }
   else {
     while(!is_nil(cdr(param_iterator))) {
@@ -1140,7 +1154,7 @@ object *parse_args(object *args, object *params) {
       arg_iterator = cdr(arg_iterator);
       param_iterator = cdr(param_iterator);
     }
-    return args;
+    return args_copy;
   }
 }
 
