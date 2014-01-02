@@ -74,6 +74,8 @@ object *comma_at_symbol;
 object *define_symbol;
 object *set_symbol;
 object *if_symbol;
+object *cond_symbol;
+object *else_symbol;
 object *lambda_symbol;
 object *begin_symbol;
 object *macro_symbol;
@@ -685,6 +687,8 @@ void init() {
   define_symbol = make_symbol("define");
   set_symbol = make_symbol("set!");
   if_symbol = make_symbol("if");
+  cond_symbol = make_symbol("cond");
+  else_symbol = make_symbol("else");
   lambda_symbol = make_symbol("lambda");
   begin_symbol = make_symbol("begin");
   macro_symbol = make_symbol("macro");
@@ -1134,6 +1138,58 @@ char is_last_exp(object *exps) {
   return is_nil(cdr(exps));
 }
 
+object *sequence_to_exp(object *seq) {
+  if(is_nil(seq))
+    return seq;
+  else if(is_nil(cdr(seq)))
+    return car(seq);
+  else
+    return cons(begin_symbol, seq);
+}
+      
+
+object *make_if(object *pred,
+                object *conseq,
+                object *alt) {
+  return cons(if_symbol,cons(pred,cons(conseq,cons(alt, nil))));
+}
+
+char is_cond(object *exp) {
+  return is_tagged_list(exp, cond_symbol);
+}
+
+object *expand_clauses(object *clauses) {
+  object *first;
+  object *rest;
+
+  if(is_nil(clauses)) {
+    return false;
+  }
+  else {
+    first = car(clauses);
+    rest = cdr(clauses);
+    if(car(first) == else_symbol) {
+      if(is_nil(rest)) {
+        return sequence_to_exp(cdr(first));
+      }
+      else {
+        fprintf(stderr,"Else clause not last.\n");
+        exit(1);
+      }
+    }
+    else {
+      return make_if(car(first),
+                     sequence_to_exp(cdr(first)),
+                     expand_clauses(rest));
+    }
+  }
+}
+
+object *cond_to_if(object *exp) {
+  assert( is_list(exp) );
+  return expand_clauses(cdr(exp));
+}
+
 char is_application(object *exp) {
   return is_cons(exp);
 }
@@ -1416,6 +1472,9 @@ object *eval(object *exp, object *env) {
     }
     else if (is_if(exp)) {
       exp = is_true(eval(if_predicate(exp), env)) ? if_consequent(exp) : if_alternative(exp);
+    }
+    else if (is_cond(exp)) {
+      exp = cond_to_if(exp);
     }
     else if (is_begin(exp)) {
       return eval_sequence(begin_actions(exp), env);
