@@ -22,4 +22,20 @@
 	((last-exp? l) (f (car l)))
 	(else (begin (f (car l)) (do f (cdr l))))))
 
+(define (consify l)
+  (if (last-exp? l) l
+      (cons (car l)
+	    (cons (consify (cdr l)) '()))))
+
+(define (nest-fns fs x)
+  (cond ((null? fs) '())
+	((atom? fs) (list fs x))
+	((last-exp? fs) (list (car fs) x))
+	(else (cons (car fs)
+		    (cons (nest-fns (cdr fs) x) '())))))
+
+(define compose
+  (macro (:rest fs)
+    `(lambda (x) ,(nest-fns fs 'x))))
+
 "End bootstrap.l"
