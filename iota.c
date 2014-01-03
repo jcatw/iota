@@ -229,6 +229,10 @@ char is_list(object *obj) {
   return obj->type == CONS || obj->type == NIL;
 }
 
+char is_atom(object *obj) {
+  return !is_list(obj);
+}
+
 // get length of list
 // linear time! use sparingly.
 long len(object *obj) {
@@ -260,6 +264,16 @@ char is_primitive_proc(object *obj) {
 object *is_null_proc(object *args) {
   assert( is_list(args) );
   return is_nil(car(args)) ? true : false;
+}
+
+object *is_list_proc(object *args) {
+  assert( is_list(args) );
+  return is_list(car(args)) ? true : false;
+}
+
+object *is_atom_proc(object *args) {
+  assert( is_list(args) );
+  return is_atom(car(args)) ? true : false;
 }
 
 object *is_boolean_proc(object *args) {
@@ -713,6 +727,8 @@ void init() {
   add_procedure("char?"      , is_char_proc      );
   add_procedure("string?"    , is_string_proc    );
   add_procedure("procedure?" , is_procedure_proc );
+  add_procedure("list?", is_list_proc);
+  add_procedure("atom?", is_atom_proc);
   add_procedure("tagged-list?", is_tagged_list_proc);
 
   add_procedure("char->integer", char_to_integer_proc);
