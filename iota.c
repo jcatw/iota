@@ -63,6 +63,7 @@ object *alloc_object() {
 }
 
 object *nil;
+object *t_symbol;
 object *false;
 object *true;
 object *symbol_table;
@@ -694,6 +695,7 @@ void init() {
   symbol_table = nil;
   keyword_table = nil;
   
+  t_symbol = make_symbol("t");
   quote_symbol = make_symbol("quote");
   backquote_symbol = make_symbol("backquote");
   comma_symbol = make_symbol("comma");
@@ -714,10 +716,10 @@ void init() {
   define_variable(make_symbol("nil"),
                   nil,
                   the_global_environment);
+  define_variable(t_symbol,
+                  t_symbol,
+                  the_global_environment);
   
-  //define_variable(make_symbol("+"),
-  //                make_primitive_proc(add_proc),
-  //                the_global_environment);
   add_procedure("null?"      , is_null_proc      );
   add_procedure("nil?"       , is_null_proc      );
   add_procedure("boolean?"   , is_boolean_proc   );
