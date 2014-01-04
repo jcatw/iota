@@ -1375,6 +1375,7 @@ object *macroexpand(object *proc, object *args) {
 }
 
 object *macroexpand_proc(object *exps) {
+  assert( is_list(exps) );
   object *macro_form;
   object *proc;
   object *macro_args;
