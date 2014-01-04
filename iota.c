@@ -758,7 +758,7 @@ void init() {
   add_procedure("reverse", reverse_proc);
 
   add_procedure("eq?", is_eq_proc);
-  add_procedure("macroexpand-f", macroexpand_proc);
+  add_procedure("macroexpand", macroexpand_proc);
 }
 
 /********/
