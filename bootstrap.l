@@ -11,6 +11,10 @@
   `(define (,fn-name ,@fn-args)
      ,@fn-body))
 
+(defmacro apply
+  (fn args)
+  `(,fn ,@(cadr args)))
+
 (define (cadr l)
   (car (cdr l)))
 
