@@ -1,5 +1,11 @@
 "Begin bootstrap.l"
 
+(define defmacro
+  (macro (macro-name macro-args :rest macro-body)
+    `(define ,macro-name
+       (macro ,macro-args
+	 ,@macro-body))))
+
 (define (cadr l)
   (car (cdr l)))
 
