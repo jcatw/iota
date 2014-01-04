@@ -6,6 +6,11 @@
        (macro ,macro-args
 	 ,@macro-body))))
 
+(defmacro defn
+  (fn-name fn-args :rest fn-body)
+  `(define (,fn-name ,@fn-args)
+     ,@fn-body))
+
 (define (cadr l)
   (car (cdr l)))
 
