@@ -758,7 +758,7 @@ void init() {
   add_procedure("reverse", reverse_proc);
 
   add_procedure("eq?", is_eq_proc);
-  //add_procedure("macroexpand-f", macroexpand_proc);
+  add_procedure("macroexpand-f", macroexpand_proc);
 }
 
 /********/
@@ -1374,11 +1374,15 @@ object *macroexpand(object *proc, object *args) {
   return expanded_body;
 }
 
-//object *macroexpand_proc(object *exps) {
-//  object *proc = eval(car(exps), the_global_environment);
-//  object *args = cadr(exps);
-//  return macroexpand(proc, args);
-//}
+object *macroexpand_proc(object *exps) {
+  object *macro_form;
+  object *proc;
+  object *macro_args;
+  macro_form = car(exps);
+  proc = eval(car(macro_form), the_global_environment);  //will only work at the top level
+  macro_args = cdr(macro_form);
+  return macroexpand(proc, macro_args);
+}
 
 object *apply_macro(object *proc, object *args, object *env) {
   assert( is_list(args) );
