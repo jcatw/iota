@@ -679,6 +679,7 @@ object *setup_environment() {
                   the_global_environment);
 
 object *macroexpand_proc(object *exps);
+object *apply_proc(object *args);
 
 void init() {
   nil = alloc_object();
@@ -759,6 +760,7 @@ void init() {
 
   add_procedure("eq?", is_eq_proc);
   add_procedure("macroexpand", macroexpand_proc);
+  add_procedure("apply", apply_proc);
 }
 
 /********/
@@ -1391,6 +1393,12 @@ object *apply_macro(object *proc, object *args, object *env) {
   return eval(expanded_body, env);
 }
 
+object *apply_proc(object *args) {
+  assert( is_list(args) );
+  fprintf(stderr, "Apply proc actually called.\n");
+  exit(1);
+}
+
 object *eval_assignment(object *exp, object *env) {
   set_variable_value(assignment_variable(exp),
                      eval(assignment_value(exp),env),
@@ -1472,6 +1480,12 @@ object *eval_backquoted(object *exp, object *env) {
   }
 }
 
+object *prepare_args_for_apply(object *args) {
+  if(is_nil(cdr(args)))
+    return car(args);
+  return cons(car(args), prepare_args_for_apply(cdr(args)));
+}
+
 object *eval(object *exp, object *env) {
   object *proc, *args;
   while(1) {
@@ -1514,12 +1528,18 @@ object *eval(object *exp, object *env) {
     }
     else if (is_application(exp)) {
       proc = eval(operator(exp), env);
+      args = operands(exp);
+      if(is_primitive_proc(proc) && proc->data.primitive_proc.fn == apply_proc) {
+        proc = eval(car(args), env);
+        //args = cdr(args);
+        args = eval(prepare_args_for_apply(cdr(args)), env);
+      }
       if(is_macro(proc)) {
-        args = operands(exp);
+        //args = operands(exp);
         return apply_macro(proc, args, env);
       }
       else {
-        args = list_of_values(operands(exp), env);
+        args = list_of_values(args, env);
         return apply(proc, args);
       }
     }

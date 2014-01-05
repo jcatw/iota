@@ -141,3 +141,7 @@
 	  (make-begin seq))))
 (define (make-if predicate consequent alternative)
   (list 'if predicate consequent alternative))
+
+(defmacro apply
+  (fn args)
+  `(,fn ,@(cadr args)))
