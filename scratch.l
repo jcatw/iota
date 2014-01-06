@@ -145,3 +145,6 @@
 (defmacro apply
   (fn args)
   `(,fn ,@(cadr args)))
+(defmacro eval
+  (form)
+  (cadr form))

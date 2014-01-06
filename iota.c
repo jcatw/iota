@@ -673,13 +673,18 @@ object *setup_environment() {
   return initial_env;
 }
 
+object *global_environment_proc(object *args) {
+  return the_global_environment;
+}
+
+object *macroexpand_proc(object *exps);
+object *apply_proc(object *args);
+object *eval_proc(object *args);
+
 #define add_procedure(scheme_name, c_name)      \
   define_variable(make_symbol(scheme_name),     \
                   make_primitive_proc(c_name),  \
                   the_global_environment);
-
-object *macroexpand_proc(object *exps);
-object *apply_proc(object *args);
 
 void init() {
   nil = alloc_object();
@@ -759,8 +764,11 @@ void init() {
   add_procedure("reverse", reverse_proc);
 
   add_procedure("eq?", is_eq_proc);
+  
   add_procedure("macroexpand", macroexpand_proc);
   add_procedure("apply", apply_proc);
+  add_procedure("eval", eval_proc);
+  add_procedure("global-env", global_environment_proc);
 }
 
 /********/
@@ -1399,6 +1407,12 @@ object *apply_proc(object *args) {
   exit(1);
 }
 
+object *eval_proc(object *args) {
+  assert( is_list(args) );
+  fprintf(stderr, "Eval proc actually called.\n");
+  exit(1);
+}
+
 object *eval_assignment(object *exp, object *env) {
   set_variable_value(assignment_variable(exp),
                      eval(assignment_value(exp),env),
@@ -1529,6 +1543,11 @@ object *eval(object *exp, object *env) {
     else if (is_application(exp)) {
       proc = eval(operator(exp), env);
       args = operands(exp);
+      if(is_primitive_proc(proc) && proc->data.primitive_proc.fn == eval_proc) {
+        exp = eval(car(args), env);
+        env = eval(cadr(args), env);
+        continue;
+      }
       if(is_primitive_proc(proc) && proc->data.primitive_proc.fn == apply_proc) {
         proc = eval(car(args), env);
         //args = cdr(args);
