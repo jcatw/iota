@@ -11,14 +11,11 @@
 /* language */
 /************/
 
-typedef enum {NIL, BOOLEAN, SYMBOL, KEYWORD, FIXNUM, CHARACTER, STRING, CONS, MACRO, PRIMITIVE_PROC, COMPOUND_PROC} object_type;
+typedef enum {NIL, SYMBOL, KEYWORD, FIXNUM, CHARACTER, STRING, CONS, MACRO, PRIMITIVE_PROC, COMPOUND_PROC} object_type;
 
 typedef struct object {
   object_type type;
   union {
-    struct {
-      char value;
-    } boolean;
     struct {
       char *value;
     } symbol;
@@ -64,8 +61,6 @@ object *alloc_object() {
 
 object *nil;
 object *t_symbol;
-object *false;
-object *true;
 object *symbol_table;
 object *keyword_table;
 object *quote_symbol;
@@ -101,18 +96,6 @@ object *cons(object *first, object *rest);
   
 char is_nil(object *obj) {
   return obj->type == NIL;
-}
-
-char is_boolean(object *obj) {
-  return obj->type == BOOLEAN;
-}
-
-char is_false(object *obj) {
-  return obj == false;
-}
-
-char is_true(object *obj) {
-  return !is_false(obj);
 }
 
 object *make_symbol(char *value) {
@@ -264,57 +247,52 @@ char is_primitive_proc(object *obj) {
 
 object *is_null_proc(object *args) {
   assert( is_list(args) );
-  return is_nil(car(args)) ? true : false;
+  return is_nil(car(args)) ? t_symbol : nil;
 }
 
 object *is_list_proc(object *args) {
   assert( is_list(args) );
-  return is_list(car(args)) ? true : false;
+  return is_list(car(args)) ? t_symbol : nil;
 }
 
 object *is_atom_proc(object *args) {
   assert( is_list(args) );
-  return is_atom(car(args)) ? true : false;
-}
-
-object *is_boolean_proc(object *args) {
-  assert( is_list(args) );
-  return is_boolean(car(args)) ? true : false;
+  return is_atom(car(args)) ? t_symbol : nil;
 }
 
 object *is_symbol_proc(object *args) {
   assert( is_list(args) );
-  return is_symbol(car(args)) ? true : false;
+  return is_symbol(car(args)) ? t_symbol : nil;
 }
 
 object *is_keyword_proc(object *args) {
   assert( is_list(args) );
-  return is_keyword(car(args)) ? true : false;
+  return is_keyword(car(args)) ? t_symbol : nil;
 }
 
 object *is_integer_proc(object *args) {
   assert( is_list(args) );
-  return is_fixnum(car(args)) ? true : false;
+  return is_fixnum(car(args)) ? t_symbol : nil;
 }
 
 object *is_char_proc(object *args) {
   assert( is_list(args) );
-  return is_character(car(args)) ? true : false;
+  return is_character(car(args)) ? t_symbol : nil;
 }
 
 object *is_string_proc(object *args) {
   assert( is_list(args) );
-  return is_string(car(args)) ? true : false;
+  return is_string(car(args)) ? t_symbol : nil;
 }
 
 object *is_cons_proc(object *args) {
   assert( is_list(args) );
-  return is_cons(car(args)) ? true : false;
+  return is_cons(car(args)) ? t_symbol : nil;
 }
 
 object *is_procedure_proc(object *args) {
   assert( is_list(args) );
-  return is_primitive_proc(car(args)) ? true : false;
+  return is_primitive_proc(car(args)) ? t_symbol : nil;
 }
 
 char is_tagged_list(object *expression, object *tag) {
@@ -333,7 +311,7 @@ object *is_tagged_list_proc(object *args) {
   exp = car(args);
   tag = cadr(args);
 
-  return is_tagged_list(exp, tag) ? true : false;
+  return is_tagged_list(exp, tag) ? t_symbol : nil;
 }
 
 object *char_to_integer_proc(object *args) {
@@ -427,9 +405,9 @@ object *is_equal_proc(object *args) {
   value = car(args)->data.fixnum.value;
   while (!is_nil(args = cdr(args))) {
     if (value != (car(args)->data.fixnum.value))
-      return false;
+      return nil;
   }
-  return true;
+  return t_symbol;
 }
 
 object *is_less_than_proc(object *args) {
@@ -442,9 +420,9 @@ object *is_less_than_proc(object *args) {
     if(previous < next)
       previous = next;
     else
-      return false;
+      return nil;
   }
-  return true;
+  return t_symbol;
 }
 
 object *is_greater_than_proc(object *args) {
@@ -457,9 +435,9 @@ object *is_greater_than_proc(object *args) {
     if (previous > next)
       previous = next;
     else
-      return false;
+      return nil;
   }
-  return true;
+  return t_symbol;
 }
 
 object *cons_proc(object *args) {
@@ -528,7 +506,7 @@ object *is_eq_proc(object *args) {
   obj1 = car(args);
   obj2 = cadr(args);
 
-  return is_eq(obj1, obj2) ? true : false;
+  return is_eq(obj1, obj2) ? t_symbol : nil;
 }
 
 object *reverse(object *head) {
@@ -689,14 +667,6 @@ object *eval_proc(object *args);
 void init() {
   nil = alloc_object();
   nil->type = NIL;
-  
-  false = alloc_object();
-  false->type = BOOLEAN;
-  false->data.boolean.value = 0;
-
-  true = alloc_object();
-  true->type = BOOLEAN;
-  true->data.boolean.value = 1;
 
   symbol_table = nil;
   keyword_table = nil;
@@ -728,7 +698,6 @@ void init() {
   
   add_procedure("null?"      , is_null_proc      );
   add_procedure("nil?"       , is_null_proc      );
-  add_procedure("boolean?"   , is_boolean_proc   );
   add_procedure("symbol?"    , is_symbol_proc    );
   add_procedure("keyword?"   , is_keyword_proc   );
   add_procedure("integer?"   , is_integer_proc   );
@@ -893,15 +862,8 @@ object *read(FILE *in) {
       }
       return make_character(character);
       break;
-    // read a boolean
-    case 't':
-      return true;
-      break;
-    case 'f':
-      return false;
-      break;
     default:
-      fprintf(stderr, "Unknown boolean literal %c\n",c);
+      fprintf(stderr, "Unknown char %c\n",c);
       exit(1);
     }
   }
@@ -1028,7 +990,7 @@ object *read(FILE *in) {
 /********/
 
 char is_self_evaluating(object *obj) {
-  return is_keyword(obj) || is_boolean(obj) || is_fixnum(obj) || is_character(obj) || is_string(obj);
+  return is_keyword(obj) || is_fixnum(obj) || is_character(obj) || is_string(obj);
 }
 
 char is_variable(object *exp) {
@@ -1103,7 +1065,7 @@ object *if_consequent(object *exp) {
 object *if_alternative(object *exp) {
   assert( is_list(exp) );
   if (is_nil(cdddr(exp)))
-    return false;
+    return nil;
   return cadddr(exp);
 }
 
@@ -1191,7 +1153,7 @@ object *expand_clauses(object *clauses) {
   object *rest;
 
   if(is_nil(clauses)) {
-    return false;
+    return nil;
   }
   else {
     first = car(clauses);
@@ -1522,7 +1484,7 @@ object *eval(object *exp, object *env) {
       return eval_definition(exp,env);
     }
     else if (is_if(exp)) {
-      exp = is_true(eval(if_predicate(exp), env)) ? if_consequent(exp) : if_alternative(exp);
+      exp = !is_nil(eval(if_predicate(exp), env)) ? if_consequent(exp) : if_alternative(exp);
     }
     else if (is_cond(exp)) {
       exp = cond_to_if(exp);
@@ -1597,10 +1559,7 @@ void write(object *obj) {
   switch(obj->type) {
   case NIL:
     printf("()");
-    break;
-  case BOOLEAN:
-    printf("#%c", is_false(obj) ? 'f' : 't');
-    break;
+    break;  
   case SYMBOL:
     printf("%s",obj->data.symbol.value);
     break;
