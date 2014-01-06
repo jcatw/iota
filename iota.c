@@ -833,39 +833,26 @@ object *read(FILE *in) {
   if(c == EOF)
     return NULL;
   else if(c == '#') {
-    c = getc(in);
-    switch(c) {
-    //read a character
-    case '\'':
+    character = getc(in);
+    if(character == '\\') {
       character = getc(in);
-      if(character == '\\') {
-        character = getc(in);
-        switch(character) {
-        case 'n':
-          character = '\n';
-          break;
-        case 't':
-          character = '\t';
-          break;
-        case 's':
-          character = ' ';
-          break;
-        default:
-          fprintf(stderr, "Unrecognized special character '\\%c'\n",character);
-          exit(1);
-          break;
-        }
+      switch(character) {
+      case 'n':
+        character = '\n';
+        break;
+      case 't':
+        character = '\t';
+        break;
+      case 's':
+        character = ' ';
+        break;
+      default:
+        fprintf(stderr, "Unrecognized special character '\\%c'\n",character);
+        exit(1);
+        break;
       }
-      if((c = getc(in)) != '\'') {
-         fprintf(stderr, "Unexpected character terminator %c\n",c);
-         exit(1);
-      }
-      return make_character(character);
-      break;
-    default:
-      fprintf(stderr, "Unknown char %c\n",c);
-      exit(1);
     }
+    return make_character(character);
   }
   // read a fixnum
   else if(isdigit(c) || (c == '-' && isdigit(peek(in)))) {
@@ -1570,7 +1557,7 @@ void write(object *obj) {
     printf("%ld",obj->data.fixnum.value);
     break;
   case CHARACTER:
-    printf("#'%c'",obj->data.character.value);
+    printf("#%c",obj->data.character.value);
     break;
   case STRING:
     printf("\"%s\"",obj->data.string.value);
