@@ -148,3 +148,5 @@
 (defmacro eval
   (form)
   (cadr form))
+
+((nil? ,'(cdr args)) ,(car args))

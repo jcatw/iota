@@ -24,6 +24,16 @@
 	,@body)
       ,@(map cadr assignments))))
 
+(defmacro and (:rest args)
+  (if (nil? (cdr args)) (car args)
+      `(cond (,(car args) (and ,@(cdr args)))
+	     (else #f))))
+
+(defmacro or (:rest args)
+  (if (nil? (cdr args)) (car args)
+      `(cond (,(car args) #t)
+	     (else (or ,@(cdr args))))))
+
 (define (last-exp? seq)
   (null? (cdr seq)))
 
