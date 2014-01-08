@@ -81,7 +81,7 @@
 
 (defmacro reading-from-file
   (file-name :rest body)
-  `(let ((stream (make-file-stream ,file-name :output)))
+  `(let ((stream (make-file-stream ,file-name :input)))
      (let ((*stdin* stream))
        ,@body)
      (close-stream stream)))
