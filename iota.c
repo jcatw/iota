@@ -51,7 +51,7 @@ typedef struct object {
       struct object *rest;
     } cons;
     struct {
-      struct object * (*fn)(struct object *args);
+      struct object * (*fn)(struct object *args, struct object *env);
     } primitive_proc;
     struct {
       struct object *parameters;
@@ -387,7 +387,7 @@ long len(object *obj) {
   }
 }
     
-object *make_primitive_proc(object *(*fn)(struct object *args)) {
+object *make_primitive_proc(object *(*fn)(struct object *args, struct object *env)) {
   object *obj;
 
   obj = alloc_object();
@@ -400,7 +400,7 @@ char is_primitive_proc(object *obj) {
   return obj->type == PRIMITIVE_PROC;
 }
 
-object *error_proc(object *args) {
+object *error_proc(object *args, object *env) {
   assert( is_list(args) );
   object *msg;
   msg = car(args);
@@ -409,52 +409,52 @@ object *error_proc(object *args) {
   return nil;
 }
 
-object *is_null_proc(object *args) {
+object *is_null_proc(object *args, object *env) {
   assert( is_list(args) );
   return is_nil(car(args)) ? t_symbol : nil;
 }
 
-object *is_list_proc(object *args) {
+object *is_list_proc(object *args, object *env) {
   assert( is_list(args) );
   return is_list(car(args)) ? t_symbol : nil;
 }
 
-object *is_atom_proc(object *args) {
+object *is_atom_proc(object *args, object *env) {
   assert( is_list(args) );
   return is_atom(car(args)) ? t_symbol : nil;
 }
 
-object *is_symbol_proc(object *args) {
+object *is_symbol_proc(object *args, object *env) {
   assert( is_list(args) );
   return is_symbol(car(args)) ? t_symbol : nil;
 }
 
-object *is_keyword_proc(object *args) {
+object *is_keyword_proc(object *args, object *env) {
   assert( is_list(args) );
   return is_keyword(car(args)) ? t_symbol : nil;
 }
 
-object *is_integer_proc(object *args) {
+object *is_integer_proc(object *args, object *env) {
   assert( is_list(args) );
   return is_fixnum(car(args)) ? t_symbol : nil;
 }
 
-object *is_char_proc(object *args) {
+object *is_char_proc(object *args, object *env) {
   assert( is_list(args) );
   return is_character(car(args)) ? t_symbol : nil;
 }
 
-object *is_string_proc(object *args) {
+object *is_string_proc(object *args, object *env) {
   assert( is_list(args) );
   return is_string(car(args)) ? t_symbol : nil;
 }
 
-object *is_cons_proc(object *args) {
+object *is_cons_proc(object *args, object *env) {
   assert( is_list(args) );
   return is_cons(car(args)) ? t_symbol : nil;
 }
 
-object *is_procedure_proc(object *args) {
+object *is_procedure_proc(object *args, object *env) {
   assert( is_list(args) );
   return is_primitive_proc(car(args)) ? t_symbol : nil;
 }
@@ -469,7 +469,7 @@ char is_tagged_list(object *expression, object *tag) {
   return 0;
 }
 
-object *is_tagged_list_proc(object *args) {
+object *is_tagged_list_proc(object *args, object *env) {
   assert( is_list(args) );
   object *exp, *tag;
   exp = car(args);
@@ -478,19 +478,19 @@ object *is_tagged_list_proc(object *args) {
   return is_tagged_list(exp, tag) ? t_symbol : nil;
 }
 
-object *char_to_integer_proc(object *args) {
+object *char_to_integer_proc(object *args, object *env) {
   assert( is_list(args) );
   assert( is_character(car(args)) );
   return make_fixnum(car(args)->data.character.value);
 }
 
-object *integer_to_char_proc(object *args) {
+object *integer_to_char_proc(object *args, object *env) {
   assert( is_list(args) );
   assert( is_fixnum(car(args)) );
   return make_character(car(args)->data.fixnum.value);
 }
 
-object *number_to_string_proc(object *args) {
+object *number_to_string_proc(object *args, object *env) {
   assert( is_list(args) );
   assert( is_fixnum(car(args)) );
   char buffer[128];
@@ -499,7 +499,7 @@ object *number_to_string_proc(object *args) {
   return make_string(buffer);
 }
 
-object *string_to_number_proc(object *args) {
+object *string_to_number_proc(object *args, object *env) {
   assert( is_list(args) );
   assert( is_string(car(args)) );
   long num = 0;
@@ -510,19 +510,19 @@ object *string_to_number_proc(object *args) {
   }
 }
 
-object *symbol_to_string_proc(object *args) {
+object *symbol_to_string_proc(object *args, object *env) {
   assert( is_list(args) );
   assert( is_symbol(car(args)) );
   return make_string(car(args)->data.symbol.value);
 }
 
-object *string_to_symbol_proc(object *args) {
+object *string_to_symbol_proc(object *args, object *env) {
   assert( is_list(args) );
   assert( is_string(car(args)) );
   return make_symbol(car(args)->data.string.value);
 }
 
-object *add_proc(object *args) {
+object *add_proc(object *args, object *env) {
   assert( is_list(args) );
   long result = 0;
 
@@ -534,7 +534,7 @@ object *add_proc(object *args) {
   return make_fixnum(result);
 }
 
-object *subtract_proc(object *args) {
+object *subtract_proc(object *args, object *env) {
   assert( is_list(args) );
   long result = car(args)->data.fixnum.value;
   args = cdr(args);
@@ -547,7 +547,7 @@ object *subtract_proc(object *args) {
   return make_fixnum(result);
 }
 
-object *multiply_proc(object *args) {
+object *multiply_proc(object *args, object *env) {
   assert( is_list(args) );
   long result = 1;
 
@@ -559,7 +559,7 @@ object *multiply_proc(object *args) {
   return make_fixnum(result);
 }
 
-object *divide_proc(object *args) {
+object *divide_proc(object *args, object *env) {
   assert( is_list(args) );
   assert( is_fixnum(car(args)) );
   long result = car(args)->data.fixnum.value;
@@ -573,7 +573,7 @@ object *divide_proc(object *args) {
   return make_fixnum(result);
 }
 
-object *is_equal_proc(object *args) {
+object *is_equal_proc(object *args, object *env) {
   assert( is_list(args) );
   assert( is_fixnum(car(args)) );
   long value;
@@ -587,7 +587,7 @@ object *is_equal_proc(object *args) {
   return t_symbol;
 }
 
-object *is_less_than_proc(object *args) {
+object *is_less_than_proc(object *args, object *env) {
   assert( is_list(args) );
   long previous, next;
 
@@ -603,7 +603,7 @@ object *is_less_than_proc(object *args) {
   return t_symbol;
 }
 
-object *is_greater_than_proc(object *args) {
+object *is_greater_than_proc(object *args, object *env) {
   assert( is_list(args) );
   long previous, next;
 
@@ -619,39 +619,39 @@ object *is_greater_than_proc(object *args) {
   return t_symbol;
 }
 
-object *cons_proc(object *args) {
+object *cons_proc(object *args, object *env) {
   assert( is_list(args) );
   return cons(car(args), cadr(args));
 }
 
-object *car_proc(object *args) {
+object *car_proc(object *args, object *env) {
   assert( is_list(args) );
   return caar(args);
 }
 
-object *cdr_proc(object *args) {
+object *cdr_proc(object *args, object *env) {
   assert( is_list(args) );
   return cdar(args);
 }
 
-object *set_car_proc(object *args) {
+object *set_car_proc(object *args, object *env) {
   assert( is_list(args) );
   car(car(args)) = cadr(args);
   return cadr(args);
 }
 
-object *set_cdr_proc(object *args) {
+object *set_cdr_proc(object *args, object *env) {
   assert( is_list(args) );
   cdr(car(args)) = cadr(args);
   return cadr(args);
 }
 
-object *list_proc(object *args) {
+object *list_proc(object *args, object *env) {
   assert( is_list(args) );
   return args;
 }
 
-object *len_proc(object *args) {
+object *len_proc(object *args, object *env) {
   assert( is_list(args) );
   return make_fixnum(len(car(args)));
 }
@@ -678,7 +678,7 @@ char is_eq(object *obj1, object *obj2) {
   }
 }
 
-object *is_eq_proc(object *args) {
+object *is_eq_proc(object *args, object *env) {
   assert( is_list(args) );
   object *obj1, *obj2;
 
@@ -698,13 +698,13 @@ object *reverse(object *head) {
   return new_head;
 }
 
-object *reverse_proc(object *args) {
+object *reverse_proc(object *args, object *env) {
   assert( is_list(args) );
   assert( is_list(car(args)) );
   return reverse(car(args));
 }
 
-object *make_socket_stream_proc(object *args) {
+object *make_socket_stream_proc(object *args, object *env) {
   assert( is_list(args) );
   object *name, *dtype, *port;
   name = car(args);
@@ -718,7 +718,7 @@ object *make_socket_stream_proc(object *args) {
                             port->data.fixnum.value);
 }
 
-object *make_file_stream_proc(object *args) {
+object *make_file_stream_proc(object *args, object *env) {
   assert( is_list(args) );
   object *name, *dtype;
   name = car(args);
@@ -730,7 +730,7 @@ object *make_file_stream_proc(object *args) {
                           is_eq(dtype, output_keyword) ? OUTPUT : INPUT);
 }
 
-object *close_stream_proc(object *args) {
+object *close_stream_proc(object *args, object *env) {
   assert( is_list(args) );
   object *stream;
 
@@ -866,15 +866,15 @@ object *setup_environment() {
   return initial_env;
 }
 
-object *global_environment_proc(object *args) {
+object *global_environment_proc(object *args, object *env) {
   return the_global_environment;
 }
 
-object *macroexpand_proc(object *exps);
-object *apply_proc(object *args);
-object *eval_proc(object *args);
-object *read_proc(object *args);
-object *write_proc(object *args);
+object *macroexpand_proc(object *exps, object *env);
+object *apply_proc(object *args, object *env);
+object *eval_proc(object *args, object *env);
+object *read_proc(object *args, object *env);
+object *write_proc(object *args, object *env);
 
 object *eval(object *exp, object *env);
 
@@ -1222,9 +1222,9 @@ object *read(object *in_stream, object *env) {
   }
 }
 
-object *read_proc(object *args) {
+object *read_proc(object *args, object *env) {
   assert( is_list(args) );
-  object *env;
+  //object *env;
   object *ins;
   env = car(args);
   if( is_nil(cdr(args)) ) {
@@ -1534,13 +1534,13 @@ object *parse_params(object *params) {
   return reverse(cleaned_params);
 }
 
-object *apply(object *proc, object *args) {
+object *apply(object *proc, object *args, object *env) {
   assert( is_list(args) );
   object *exp;
   object *parsed_args;
   object *parsed_params;
   if (is_primitive_proc(proc))
-    return (proc->data.primitive_proc.fn)(args);
+    return (proc->data.primitive_proc.fn)(args, env);
   else if (is_compound_proc(proc)) {
     parsed_args = parse_args(args, proc->data.compound_proc.parameters);
     parsed_params = parse_params(proc->data.compound_proc.parameters);
@@ -1579,29 +1579,31 @@ object *macroexpand(object *proc, object *args) {
   return expanded_body;
 }
 
-object *macroexpand_proc(object *exps) {
+object *macroexpand_proc(object *exps, object *env) {
   assert( is_list(exps) );
   object *macro_form;
   object *proc;
   object *macro_args;
   macro_form = car(exps);
   proc = eval(car(macro_form), the_global_environment);  //will only work at the top level
+  assert( is_macro(proc) );
   macro_args = cdr(macro_form);
   return macroexpand(proc, macro_args);
 }
 
 object *apply_macro(object *proc, object *args, object *env) {
+  assert( is_macro(proc) );
   assert( is_list(args) );
   object *expanded_body = macroexpand(proc, args);
   return eval(expanded_body, env);
 }
 
-object *apply_proc(object *args) {
+object *apply_proc(object *args, object *env) {
   assert( is_list(args) );
   error("Apply proc actually called.");
 }
 
-object *eval_proc(object *args) {
+object *eval_proc(object *args, object *env) {
   assert( is_list(args) );
   error("Eval proc actually called.");
 }
@@ -1748,11 +1750,11 @@ object *eval(object *exp, object *env) {
       }
       else {
         args = list_of_values(args, env);
-        if(is_primitive_proc(proc) &&
-           (proc->data.primitive_proc.fn == write_proc ||
-            proc->data.primitive_proc.fn == read_proc))
-          args = cons(env, args);
-        return apply(proc, args);
+        //if(is_primitive_proc(proc) &&
+        //   (proc->data.primitive_proc.fn == write_proc ||
+        //    proc->data.primitive_proc.fn == read_proc))
+        //  args = cons(env, args);
+        return apply(proc, args, env);
       }
     }
     else {
@@ -1836,9 +1838,10 @@ void write(object *obj, object *out_stream, object *env) {
   }
 }
 
-object *write_proc(object *args) {
+object *write_proc(object *args, object *env) {
   assert( is_list(args) );
-  object *env, *obj, *out_stream;
+  //object *env;
+  object *obj, *out_stream;
 
   env = car(args);
   obj = cadr(args);
