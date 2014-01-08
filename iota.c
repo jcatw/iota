@@ -123,6 +123,11 @@ object *cons(object *first, object *rest);
 #define caddr(X) (car(cdr(cdr(X))))
 #define cadddr(X) (car(cdr(cdr(cdr(X)))))
 #define caadr(X) (car(car(cdr(X))))
+
+void error(char *msg) {
+  fprintf(stderr,"%s\n",msg);
+  exit(1);
+}
   
 char is_nil(object *obj) {
   return obj->type == NIL;
@@ -275,11 +280,9 @@ void init_sockaddr (struct sockaddr_in *name,
   name->sin_family = AF_INET;
   name->sin_port = htons (port);
   hostinfo = gethostbyname (hostname);
-  if (hostinfo == NULL) 
-    {
-      fprintf (stderr, "Unknown host %s.\n", hostname);
-      exit (EXIT_FAILURE);
-    }
+  if (hostinfo == NULL) {
+    error("Unknown host.");
+  }
   name->sin_addr = *(struct in_addr *) hostinfo->h_addr;
 }
 
@@ -313,8 +316,7 @@ object *make_file_stream(char* stream_name, directiontype direction) {
     obj->data.stream.fp = fdopen(obj->data.stream.fd, "w");
   }
   if(!obj->data.stream.fd || !obj->data.stream.fp) {
-    fprintf(stderr, "Could not open file stream.\n");
-    exit(1);
+    error("Could not open file stream.");
   }
   // turn off buffering
   setvbuf(obj->data.stream.fp, NULL, _IONBF, 0);
@@ -337,8 +339,7 @@ object *make_socket_stream(char* host_name, int port, directiontype direction) {
   if(direction == INPUT) {
     obj->data.stream.directiontype = INPUT;
     if (connect(sock, (struct sockaddr *) &servername, sizeof(servername)) < 0) {
-      fprintf(stderr, "Connection failed.\n");
-      exit(1);
+      error("Connection failed.");
     }
     obj->data.stream.fp = fdopen(obj->data.stream.fd,"r");
   }
@@ -351,8 +352,7 @@ object *make_socket_stream(char* host_name, int port, directiontype direction) {
     obj->data.stream.fp = fdopen(obj->data.stream.fd,"w");
   }
   if(!obj->data.stream.fd || !obj->data.stream.fp) {
-    fprintf(stderr, "Could not open socket stream.\n");
-    exit(1);
+    error("Could not open socket stream.");
   }
   // line buffering
   setvbuf(obj->data.stream.fp, NULL, _IOLBF, BUFFER_MAX);
@@ -389,8 +389,7 @@ void close_stream(object *stream) {
     shutdown(stream->data.stream.fd, 2);  //2: stop reception and transmission
   }
   else {
-    fprintf(stderr, "Trying to close unknown stream type.\n");
-    exit(1);
+    error("Trying to close unknown stream type.");
   }
 }
 
@@ -420,6 +419,15 @@ object *make_primitive_proc(object *(*fn)(struct object *args)) {
 
 char is_primitive_proc(object *obj) {
   return obj->type == PRIMITIVE_PROC;
+}
+
+object *error_proc(object *args) {
+  assert( is_list(args) );
+  object *msg;
+  msg = car(args);
+  assert( is_string(msg) );
+  error(msg->data.string.value);
+  return nil;
 }
 
 object *is_null_proc(object *args) {
@@ -825,8 +833,7 @@ object *lookup_variable_value(object *var, object *env) {
     }
     env = enclosing_environment(env);
   }
-  fprintf(stderr, "Unbound variable.\n");
-  exit(1);
+  error("Unbound variable.");
 }
 
 void set_variable_value(object *var,
@@ -848,8 +855,7 @@ void set_variable_value(object *var,
     }
     env = enclosing_environment(env);
   }
-  fprintf(stderr, "Unbound variable.\n");
-  exit(1);
+  error("Unbound variable.");
 }
 
 void define_variable(object *var,
@@ -943,55 +949,56 @@ void init() {
   define_variable(stdout_symbol,
                   stdout_stream,
                   the_global_environment);
-  
-  add_procedure("null?"      , is_null_proc      );
-  add_procedure("nil?"       , is_null_proc      );
-  add_procedure("symbol?"    , is_symbol_proc    );
-  add_procedure("keyword?"   , is_keyword_proc   );
-  add_procedure("integer?"   , is_integer_proc   );
-  add_procedure("char?"      , is_char_proc      );
-  add_procedure("string?"    , is_string_proc    );
-  add_procedure("procedure?" , is_procedure_proc );
-  add_procedure("list?", is_list_proc);
-  add_procedure("atom?", is_atom_proc);
-  add_procedure("tagged-list?", is_tagged_list_proc);
 
-  add_procedure("char->integer", char_to_integer_proc);
-  add_procedure("integer->char", integer_to_char_proc);
-  add_procedure("number->string", number_to_string_proc);
-  add_procedure("string->number", string_to_number_proc);
-  add_procedure("symbol->string", symbol_to_string_proc);
-  add_procedure("string->symbol", string_to_symbol_proc);
+  add_procedure("error"        , error_proc          );
+  add_procedure("null?"        , is_null_proc        );
+  add_procedure("nil?"         , is_null_proc        );
+  add_procedure("symbol?"      , is_symbol_proc      );
+  add_procedure("keyword?"     , is_keyword_proc     );
+  add_procedure("integer?"     , is_integer_proc     );
+  add_procedure("char?"        , is_char_proc        );
+  add_procedure("string?"      , is_string_proc      );
+  add_procedure("procedure?"   , is_procedure_proc   );
+  add_procedure("list?"        , is_list_proc        );
+  add_procedure("atom?"        , is_atom_proc        );
+  add_procedure("tagged-list?" , is_tagged_list_proc );
 
-  add_procedure("+", add_proc);
-  add_procedure("-", subtract_proc);
-  add_procedure("*", multiply_proc);
-  add_procedure("/", divide_proc);
-  add_procedure("=", is_equal_proc);
-  add_procedure("<", is_less_than_proc);
-  add_procedure(">", is_greater_than_proc);
+  add_procedure("char->integer"  , char_to_integer_proc  );
+  add_procedure("integer->char"  , integer_to_char_proc  );
+  add_procedure("number->string" , number_to_string_proc );
+  add_procedure("string->number" , string_to_number_proc );
+  add_procedure("symbol->string" , symbol_to_string_proc );
+  add_procedure("string->symbol" , string_to_symbol_proc );
 
-  add_procedure("cons", cons_proc);
-  add_procedure("car", car_proc);
-  add_procedure("cdr", cdr_proc);
-  add_procedure("set-car!", set_car_proc);
-  add_procedure("set-cdr!", set_cdr_proc);
-  add_procedure("list", list_proc);
-  add_procedure("len", len_proc);
-  add_procedure("reverse", reverse_proc);
+  add_procedure("+" , add_proc             );
+  add_procedure("-" , subtract_proc        );
+  add_procedure("*" , multiply_proc        );
+  add_procedure("/" , divide_proc          );
+  add_procedure("=" , is_equal_proc        );
+  add_procedure("<" , is_less_than_proc    );
+  add_procedure(">" , is_greater_than_proc );
+
+  add_procedure("cons"     , cons_proc    );
+  add_procedure("car"      , car_proc     );
+  add_procedure("cdr"      , cdr_proc     );
+  add_procedure("set-car!" , set_car_proc );
+  add_procedure("set-cdr!" , set_cdr_proc );
+  add_procedure("list"     , list_proc    );
+  add_procedure("len"      , len_proc     );
+  add_procedure("reverse"  , reverse_proc );
 
   add_procedure("eq?", is_eq_proc);
   
-  add_procedure("macroexpand", macroexpand_proc);
-  add_procedure("apply", apply_proc);
-  add_procedure("eval", eval_proc);
-  add_procedure("read", read_proc);
-  add_procedure("write", write_proc);
-  add_procedure("global-env", global_environment_proc);
+  add_procedure("macroexpand" , macroexpand_proc        );
+  add_procedure("apply"       , apply_proc              );
+  add_procedure("eval"        , eval_proc               );
+  add_procedure("read"        , read_proc               );
+  add_procedure("write"       , write_proc              );
+  add_procedure("global-env"  , global_environment_proc );
 
-  add_procedure("make-file-stream", make_file_stream_proc);
-  add_procedure("make-socket-stream", make_socket_stream_proc);
-  add_procedure("close-stream", close_stream_proc);
+  add_procedure("make-file-stream"   , make_file_stream_proc   );
+  add_procedure("make-socket-stream" , make_socket_stream_proc );
+  add_procedure("close-stream"       , close_stream_proc       );
 }
 
 /********/
@@ -1135,8 +1142,7 @@ object *read(object *in_stream, object *env) {
       return make_fixnum(num);
     }
     else {
-      fprintf(stderr, "Number not followed by delimiter\n");
-      exit(1);
+      error("Number not followed by delimiter");
     }
   }
   //read a keyword
@@ -1581,8 +1587,7 @@ object *apply(object *proc, object *args) {
                            proc->data.compound_proc.env));
   }
   else {
-    fprintf(stderr, "Unknown procedure type\n");
-    exit(1);
+    error("Unknown procedure type");
   }
 }
 object *macroexpand(object *proc, object *args) {
@@ -1607,8 +1612,7 @@ object *macroexpand(object *proc, object *args) {
                                     proc->data.macro.env));
   }
   else {
-    fprintf(stderr, "Macro not found.\n");
-    exit(1);
+    error("Macro not found.");
   }
     
   return expanded_body;
@@ -1633,14 +1637,12 @@ object *apply_macro(object *proc, object *args, object *env) {
 
 object *apply_proc(object *args) {
   assert( is_list(args) );
-  fprintf(stderr, "Apply proc actually called.\n");
-  exit(1);
+  error("Apply proc actually called.");
 }
 
 object *eval_proc(object *args) {
   assert( is_list(args) );
-  fprintf(stderr, "Eval proc actually called.\n");
-  exit(1);
+  error("Eval proc actually called.");
 }
 
 object *eval_assignment(object *exp, object *env) {
@@ -1699,13 +1701,11 @@ object *eval_backquoted(object *exp, object *env) {
       thing_to_splice = text_of_quotation(car(exp));
       head = eval(thing_to_splice, env);
       if(is_nil(head)) {
-        fprintf(stderr, "Attempt to splice in nil.\n");
-        exit(1);
+        error("Attempt to splice in nil.");
       }
       if(!is_cons(head)) {
         printf("%d\n",thing_to_splice->type);
-        fprintf(stderr, "Attempt to splice in non-cons.\n");
-        exit(1);
+        error("Attempt to splice in non-cons.");
       }
       this = head;
       while(!is_nil(cdr(this)))
@@ -1873,8 +1873,7 @@ void write(object *obj, object *out_stream, object *env) {
     fprintf(out,"#<stream>");
     break;
   default:
-    fprintf(stderr, "Cannot write unknown type.\n");
-    exit(1);
+    error("Cannot write unknown type.");
   }
   //fflush(stdout);
 }
