@@ -330,8 +330,6 @@ object *make_socket_stream(char* host_name, int port, directiontype direction) {
 
   obj = alloc_object();
   obj->type = STREAM;
-  //fprintf(stderr,"Socket streams not implemented yet.\n");
-  //exit(1);
   obj->data.stream.streamtype = SOCKETSTREAM;
   sock = socket(PF_INET, SOCK_STREAM, 0);
   init_sockaddr(&servername,host_name,port);  
@@ -362,29 +360,10 @@ object *make_socket_stream(char* host_name, int port, directiontype direction) {
 void close_stream(object *stream) {
   assert( is_stream(stream) );
   if(is_file_stream(stream)) {
-    // stdin / stdout
-    //if(stream->data.stream.fd == NULL) {
-    //  if(stream->data.stream.fp_in == NULL) {
-    //    fprintf(stderr,"Tried to close stdout.\n");
-    //    exit(1);
-    //  }
-    //  else if (stream->data.stream.fp_out == NULL) {
-    //    fprintf(stderr,"Tried to close stdin.\n");
-    //    exit(1);
-    //  }
-    //  else {
-    //    fprintf(stderr,"Tried to close stream with bad file descriptor.\n");
-    //    exit(1);
-    //  }
-    //}
-    //fclose(stream->data.stream.fp_in);
-    //fclose(stream->data.stream.fp_out);
     fclose(stream->data.stream.fp);
     close(stream->data.stream.fd);
   }
   else if (is_socket_stream(stream)) {
-    //fclose(stream->data.stream.fp_in);
-    //fclose(stream->data.stream.fp_out);
     fclose(stream->data.stream.fp);
     shutdown(stream->data.stream.fd, 2);  //2: stop reception and transmission
   }
@@ -1286,13 +1265,11 @@ char is_assignment(object *exp) {
 
 object *assignment_variable(object *exp) {
   assert( is_list(exp) );
-  //return car(cdr(exp));
   return cadr(exp);
 }
 
 object *assignment_value(object *exp) {
   assert( is_list(exp) );
-  //return car(cdr(cdr(exp)));
   return caddr(exp);
 }
 
@@ -1302,7 +1279,6 @@ char is_definition(object *exp) {
 
 object *definition_variable(object *exp) {
   assert( is_list(exp) );
-  //return cadr(exp);
   if (is_symbol(cadr(exp)))
     return cadr(exp);
   else
@@ -1313,7 +1289,6 @@ object *make_lambda(object *params, object *body);
 
 object *definition_value(object *exp) {
   assert( is_list(exp) );
-  //return caddr(exp);
   if(is_symbol(cadr(exp)))
     return caddr(exp);
   //cdadr: formal parameters
@@ -1362,7 +1337,6 @@ object *lambda_body(object *exp) {
 }
 
 char is_macro (object *obj) {
-  //return (car(exp))->type == MACRO;
   return obj->type == MACRO;
 }
 
@@ -1530,17 +1504,12 @@ object *parse_args(object *args, object *params) {
     return args_copy;
   }
   else if( is_eq(car(params), rest_keyword) ) {
-    //return cons(cons(quote_symbol, cons(args_copy, nil)),nil);
-    //return cons(quote_symbol, cons(args_copy, nil));
     return cons(args_copy, nil);
-    //return args_copy;
   }
   else {
     while(!is_nil(cdr(param_iterator))) {
       if (is_eq(cadr(param_iterator), rest_keyword)) {
         cdr(arg_iterator) = cons(cdr(arg_iterator), nil);
-        //cdr(arg_iterator) = cons(quote_symbol, cons(cdr(arg_iterator), nil));
-        //cdr(arg_iterator) = cons(cons(quote_symbol, cons(cdr(arg_iterator), nil)),nil);
         break;
       }
       arg_iterator = cdr(arg_iterator);
@@ -1573,12 +1542,8 @@ object *apply(object *proc, object *args) {
   if (is_primitive_proc(proc))
     return (proc->data.primitive_proc.fn)(args);
   else if (is_compound_proc(proc)) {
-    // do parse
     parsed_args = parse_args(args, proc->data.compound_proc.parameters);
     parsed_params = parse_params(proc->data.compound_proc.parameters);
-    // do not parse
-    //parsed_args = args;
-    //parsed_params = proc->data.compound_proc.parameters;
     exp = proc->data.compound_proc.body;
     return eval_sequence(exp,
                          extend_environment(
@@ -1598,12 +1563,8 @@ object *macroexpand(object *proc, object *args) {
   object *parsed_args;
   
   if(is_macro(proc)) {
-    //do parse
     parsed_args = parse_args(args, proc->data.macro.parameters);
     parsed_params = parse_params(proc->data.macro.parameters);
-    // do not parse
-    //parsed_args = args;
-    //parsed_params = proc->data.macro.parameters;
     body = proc->data.macro.body;
     expanded_body = eval_sequence(body,
                                   extend_environment(
@@ -1780,11 +1741,9 @@ object *eval(object *exp, object *env) {
       }
       if(is_primitive_proc(proc) && proc->data.primitive_proc.fn == apply_proc) {
         proc = eval(car(args), env);
-        //args = cdr(args);
         args = eval(prepare_args_for_apply(cdr(args)), env);
       }
       if(is_macro(proc)) {
-        //args = operands(exp);
         return apply_macro(proc, args, env);
       }
       else {
@@ -1875,7 +1834,6 @@ void write(object *obj, object *out_stream, object *env) {
   default:
     error("Cannot write unknown type.");
   }
-  //fflush(stdout);
 }
 
 object *write_proc(object *args) {
@@ -1905,15 +1863,12 @@ void read_eval_file(object* in_stream) {
   object *obj;
   while((obj = read(in_stream, the_global_environment)) != eof_object) {
     eval(obj, the_global_environment);
-    //write(eval(obj, the_global_environment));
-    //printf("\n");
   }
 }
 
 void read_eval_print_file(object *in_stream, object *out_stream) {
   object *obj;
   while((obj = read(in_stream, the_global_environment)) != eof_object) {
-    //eval(obj, the_global_environment);
     write(eval(obj, the_global_environment), out_stream, the_global_environment);
     printf("\n");
   }
@@ -1930,7 +1885,6 @@ void repl() {
     read_lisp_thing = read(stdin_stream, the_global_environment);
     evaled_lisp_thing = eval(read_lisp_thing, the_global_environment);
     write(evaled_lisp_thing, stdout_stream, the_global_environment);
-    //write(eval(read(stdin), the_global_environment));
     out_stream = eval(stdout_symbol, the_global_environment);
     fprintf(out_stream->data.stream.fp,"\n");
   }
@@ -1938,19 +1892,15 @@ void repl() {
 
 int main() {
   char bootstrap_code_fname[128] = "bootstrap.l";
-  //FILE *bootstrap_code;
   object *bootstrap_stream;
-  //object *obj;
   printf("Iota-Bootstrap.\n");
   
   printf("Initializing core...\n");
   init();
   
   printf("Bootstrapping iota...\n");
-  //bootstrap_code = fopen(bootstrap_code_fname,"r");
   bootstrap_stream = make_file_stream(bootstrap_code_fname, INPUT);
   read_eval_file(bootstrap_stream);
-  //fclose(bootstrap_code);
   close_stream(bootstrap_stream);
 
   repl();
