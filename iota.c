@@ -344,8 +344,7 @@ object *make_socket_stream(char* host_name, int port, directiontype direction) {
   else {
     obj->data.stream.directiontype = OUTPUT;
     if (listen(obj->data.stream.fd, CONNECTIONS_MAX) < 0) {
-      fprintf(stderr,"Could not listen on socket.\n");
-      exit(1);
+      error("Could not listen on socket.");
     }
     obj->data.stream.fp = fdopen(obj->data.stream.fd,"w");
   }
@@ -1044,15 +1043,13 @@ object *read_pair(object *in_stream, object *env) {
   if (c == '.') {
     c = peek(in);
     if (!is_delimiter(c)) {
-      fprintf(stderr,"Dot not followed by delimiter.\n");
-      exit(1);
+      error("Dot not followed by delimiter");
     }
     rest_obj = read(in_stream, env);
     eat_whitespace(in);
     c = getc(in);
     if (c != ')') {
-      fprintf(stderr,"Unclosed list.\n");
-      exit(1);
+      error("Unclosed list.");
     }
     return cons(first_obj, rest_obj);
   }
@@ -1071,6 +1068,7 @@ object *read(object *in_stream, object *env) {
   long num = 0;
   char character;
   char buffer[BUFFER_MAX];
+  char error_msg[BUFFER_MAX];
 
   if(in_stream == stdin_stream)
     in_stream = eval(stdin_symbol, env);
@@ -1098,8 +1096,8 @@ object *read(object *in_stream, object *env) {
         character = ' ';
         break;
       default:
-        fprintf(stderr, "Unrecognized special character '\\%c'\n",character);
-        exit(1);
+        sprintf(error_msg,"Unrecognized special character '\\%c'",character);
+        error(error_msg);
         break;
       }
     }
@@ -1132,8 +1130,8 @@ object *read(object *in_stream, object *env) {
         buffer[i++] = c;
       }
       else {
-        fprintf(stderr, "Keyword too long; max length is %d.\n", BUFFER_MAX);
-        exit(1);
+        sprintf(error_msg,"Keyword too long; max length is %d.", BUFFER_MAX);
+        error(error_msg);
       }
       c = getc(in);
     }
@@ -1143,8 +1141,8 @@ object *read(object *in_stream, object *env) {
       return make_keyword(buffer);
     }
     else {
-      fprintf(stderr, "Keyword not followed by delimiter; found '%c'.\n", c);
-      exit(1);
+      sprintf(error_msg, "Keyword not followed by delimiter; found '%c'.", c);
+      error(error_msg);
     }
   }
   //read a symbol
@@ -1156,8 +1154,8 @@ object *read(object *in_stream, object *env) {
         buffer[i++] = c;
       }
       else {
-        fprintf(stderr, "Symbol too long; max length is %d.\n", BUFFER_MAX);
-        exit(1);
+        sprintf(error_msg, "Symbol too long; max length is %d.", BUFFER_MAX);
+        error(error_msg);
       }
       c = getc(in);
     }
@@ -1167,8 +1165,8 @@ object *read(object *in_stream, object *env) {
       return make_symbol(buffer);
     }
     else {
-      fprintf(stderr, "Symbol not followed by delimiter; found '%c'.\n", c);
-      exit(1);
+      sprintf(error_msg, "Symbol not followed by delimiter; found '%c'.", c);
+      error(error_msg);
     }
   }
   //read a string
@@ -1181,15 +1179,15 @@ object *read(object *in_stream, object *env) {
           c = '\n';
       }
       if(c == EOF) {
-        fprintf(stderr,"Non-terminated string literal.\n");
-        exit(1);
+        sprintf(error_msg,"Non-terminated string literal.");
+        error(error_msg);
       }
       // save space for null terminator
       if(i < BUFFER_MAX - 1)
         buffer[i++] = c;
       else {
-        fprintf(stderr, "String overflow; maximum string length is %d.\n", BUFFER_MAX);
-        exit(1);
+        sprintf(error_msg, "String overflow; maximum string length is %d.", BUFFER_MAX);
+        error(error_msg);
       }
     }
     buffer[i] = '\0';
@@ -1217,8 +1215,8 @@ object *read(object *in_stream, object *env) {
       return cons(comma_symbol, cons(read(in_stream,env), nil));
   }
   else {
-    fprintf(stderr, "Bad input: unexpected '%c'\n", c);
-    exit(1);
+    sprintf(error_msg, "Bad input: unexpected '%c'", c);
+    error(error_msg);
   }
 }
 
@@ -1411,8 +1409,7 @@ object *expand_clauses(object *clauses) {
         return sequence_to_exp(cdr(first));
       }
       else {
-        fprintf(stderr,"Else clause not last.\n");
-        exit(1);
+        error("Else clause not last.");
       }
     }
     else {
@@ -1758,12 +1755,10 @@ object *eval(object *exp, object *env) {
       }
     }
     else {
-      fprintf(stderr,
-              "Cannot eval unknown expression type.\n");
-      exit(1);
+      error("Cannot eval unknown expression type.");
     }
   }
-  fprintf(stderr,"Eval illegal state.\n");
+  error("Eval illegal state.");
   exit(1);
 }
 
