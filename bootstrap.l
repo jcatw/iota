@@ -10,6 +10,9 @@
   (fn-name fn-args :rest fn-body)
   `(define (,fn-name ,@fn-args)
      ,@fn-body))
+
+(define *stdin-std* *stdin*)
+(define *stdout-std* *stdout*)
   
 (define (cadr l)
   (car (cdr l)))
@@ -58,5 +61,29 @@
 (define compose
   (macro (:rest fs)
     `(lambda (x) ,(nest-fns fs 'x))))
+
+(defmacro writing-to
+  (stream :rest body)
+  `(let ((*stdout* ,stream))
+     ,@body))
+
+(defmacro writing-to-file
+  (file-name :rest body)
+  `(let ((stream (make-file-stream ,file-name :output)))
+     (let ((*stdout* stream))
+       ,@body)
+     (close-stream stream)))
+
+(defmacro reading-from
+  (stream :rest body)
+  `(let ((*stdin* ,stream))
+     ,@body))
+
+(defmacro reading-from-file
+  (file-name :rest body)
+  `(let ((stream (make-file-stream ,file-name :output)))
+     (let ((*stdin* stream))
+       ,@body)
+     (close-stream stream)))
 
 "End bootstrap.l"

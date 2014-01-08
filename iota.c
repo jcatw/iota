@@ -101,6 +101,11 @@ object *rest_keyword;
 object *eof_object;
 object *stdin_stream;
 object *stdout_stream;
+object *stdin_symbol;
+object *stdout_symbol;
+
+object *output_keyword;
+object *input_keyword;
 
 object *the_empty_environment;
 object *the_global_environment;
@@ -278,80 +283,79 @@ void init_sockaddr (struct sockaddr_in *name,
   name->sin_addr = *(struct in_addr *) hostinfo->h_addr;
 }
 
-object *make_stream(char* stream_name, streamtype stype, directiontype direction) {
+object *make_file_stream(char* stream_name, directiontype direction) {
+  object *obj;
+
+  obj = alloc_object();
+  obj->type = STREAM;
+
+  obj->data.stream.streamtype = FILESTREAM;
+  if(strcmp(stream_name, "stdin") == 0 ) {
+    obj->data.stream.fd = 0;
+    obj->data.stream.fp = stdin;
+    obj->data.stream.directiontype = INPUT;
+    return obj;
+  }
+  if (strcmp(stream_name, "stdout") == 0) {
+    obj->data.stream.fd = 0;
+    obj->data.stream.fp = stdout;
+    obj->data.stream.directiontype = OUTPUT;
+    return obj;
+  }
+  if (direction == INPUT) {
+    obj->data.stream.directiontype = INPUT;
+    obj->data.stream.fd = open(stream_name, O_RDONLY | O_CREAT | O_NONBLOCK, S_IRUSR | S_IWUSR);
+    obj->data.stream.fp = fdopen(obj->data.stream.fd, "r");
+  }
+  else {
+    obj->data.stream.directiontype = OUTPUT;
+    obj->data.stream.fd = open(stream_name, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
+    obj->data.stream.fp = fdopen(obj->data.stream.fd, "w");
+  }
+  if(!obj->data.stream.fd || !obj->data.stream.fp) {
+    fprintf(stderr, "Could not open file stream.\n");
+    exit(1);
+  }
+  // turn off buffering
+  setvbuf(obj->data.stream.fp, NULL, _IONBF, 0);
+  return obj;
+}
+
+object *make_socket_stream(char* host_name, int port, directiontype direction) {
   object *obj;
   int sock;
   struct sockaddr_in servername;
 
   obj = alloc_object();
   obj->type = STREAM;
-  switch(stype) {
-  case FILESTREAM:
-    obj->data.stream.streamtype = FILESTREAM;
-    if(strcmp(stream_name, "stdin") == 0 ) {
-      obj->data.stream.fd = NULL;
-      obj->data.stream.fp = stdin;
-      obj->data.stream.directiontype = INPUT;
+  //fprintf(stderr,"Socket streams not implemented yet.\n");
+  //exit(1);
+  obj->data.stream.streamtype = SOCKETSTREAM;
+  sock = socket(PF_INET, SOCK_STREAM, 0);
+  init_sockaddr(&servername,host_name,port);  
+  obj->data.stream.fd = sock;
+  if(direction == INPUT) {
+    obj->data.stream.directiontype = INPUT;
+    if (connect(sock, (struct sockaddr *) &servername, sizeof(servername)) < 0) {
+      fprintf(stderr, "Connection failed.\n");
+      exit(1);
     }
-    else if (strcmp(stream_name, "stdout") == 0) {
-      obj->data.stream.fd = NULL;
-      obj->data.stream.fp = stdout;
-      obj->data.stream.directiontype = OUTPUT;
-    }
-    else {
-      if (direction == INPUT) {
-        obj->data.stream.directiontype = INPUT;
-        obj->data.stream.fd = open(stream_name, O_RDONLY | O_CREAT | O_NONBLOCK, S_IRUSR | S_IWUSR);
-        obj->data.stream.fp = fdopen(obj->data.stream.fd, "r");
-      }
-      else {
-        obj->data.stream.directiontype = OUTPUT;
-        obj->data.stream.fd = open(stream_name, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
-        obj->data.stream.fp = fdopen(obj->data.stream.fd, "w");
-      }
-      if(!obj->data.stream.fd || !obj->data.stream.fp) {
-        fprintf(stderr, "Could not open file stream.\n");
-        exit(1);
-      }
-      // turn off buffering
-      setvbuf(obj->data.stream.fp, NULL, _IONBF, 0);
-    }
-    break;
-  case SOCKETSTREAM:
-    fprintf(stderr,"Socket streams not implemented yet.\n");
-    exit(1);
-    //obj->data.stream.streamtype = SOCKETSTREAM;
-    //sock = socket(PF_INET, SOCK_STREAM, 0);
-    //init_sockaddr(&servername,stream_name,21312);  // port 21312 for now...
-    //obj->data.stream.fd = sock;
-    //if(direction == INPUT) {
-    //  obj->data.stream.directiontype = INPUT;
-    //  if (connect(sock, (struct sockaddr *) &servername, sizeof(servername)) < 0) {
-    //    fprintf(stderr, "Connection failed.\n");
-    //    exit(1);
-    //  }
-    //  obj->data.stream.fp = fdopen(obj->data.stream.fd,"r");
-    //}
-    //else {
-    //  obj->data.stream.directiontype = OUTPUT;
-    //  if (listen(obj->data.stream.fd, CONNECTIONS_MAX) < 0) {
-    //    fprintf(stderr,"Could not listen on socket.\n");
-    //    exit(1);
-    //  }
-    //  obj->data.stream.fp = fdopen(obj->data.stream.fd,"w");
-    //}
-    //if(!obj->data.stream.fd || !obj->data.stream.fp) {
-    //  fprintf(stderr, "Could not open socket stream.\n");
-    //  exit(1);
-    //}
-    //// line buffering
-    //setvbuf(obj->data.stream.fp, NULL, _IOLBF, BUFFER_MAX);
-    //break;
-  default:
-    fprintf(stderr, "Unknown stream type %d.\n", stype);
-    exit(1);
-    break;
+    obj->data.stream.fp = fdopen(obj->data.stream.fd,"r");
   }
+  else {
+    obj->data.stream.directiontype = OUTPUT;
+    if (listen(obj->data.stream.fd, CONNECTIONS_MAX) < 0) {
+      fprintf(stderr,"Could not listen on socket.\n");
+      exit(1);
+    }
+    obj->data.stream.fp = fdopen(obj->data.stream.fd,"w");
+  }
+  if(!obj->data.stream.fd || !obj->data.stream.fp) {
+    fprintf(stderr, "Could not open socket stream.\n");
+    exit(1);
+  }
+  // line buffering
+  setvbuf(obj->data.stream.fp, NULL, _IOLBF, BUFFER_MAX);
   return obj;
 }
 
@@ -713,18 +717,30 @@ object *reverse_proc(object *args) {
   return reverse(car(args));
 }
 
-object *make_stream_proc(object *args) {
+object *make_socket_stream_proc(object *args) {
   assert( is_list(args) );
-  object *name, *stype, *dtype;
+  object *name, *dtype, *port;
   name = car(args);
-  stype = cadr(args);
+  port = cadr(args);
   dtype = caddr(args);
   assert( is_string(name) );
-  assert( is_fixnum(stype) );
-  assert( is_fixnum(dtype) );
-  return make_stream(name->data.string.value,
-                     stype->data.fixnum.value == 0 ? FILESTREAM : SOCKETSTREAM,
-                     dtype->data.fixnum.value == 0 ? OUTPUT : INPUT);
+  assert( is_fixnum(port) );
+  assert( is_keyword(dtype) );
+  return make_socket_stream(name->data.string.value,
+                            is_eq(dtype, output_keyword) ? OUTPUT : INPUT,
+                            port->data.fixnum.value);
+}
+
+object *make_file_stream_proc(object *args) {
+  assert( is_list(args) );
+  object *name, *dtype;
+  name = car(args);
+  dtype = cadr(args);
+  assert( is_string(name) );
+  assert( is_keyword(dtype) );
+  
+  return make_file_stream(name->data.string.value,
+                          is_eq(dtype, output_keyword) ? OUTPUT : INPUT);
 }
 
 object *close_stream_proc(object *args) {
@@ -875,6 +891,8 @@ object *eval_proc(object *args);
 object *read_proc(object *args);
 object *write_proc(object *args);
 
+object *eval(object *exp, object *env);
+
 #define add_procedure(scheme_name, c_name)      \
   define_variable(make_symbol(scheme_name),     \
                   make_primitive_proc(c_name),  \
@@ -901,6 +919,8 @@ void init() {
   begin_symbol = make_symbol("begin");
   macro_symbol = make_symbol("macro");
   rest_keyword = make_keyword(":rest");
+  output_keyword = make_keyword(":output");
+  input_keyword = make_keyword(":input");
 
   the_empty_environment = nil;
   the_global_environment = setup_environment();
@@ -913,12 +933,14 @@ void init() {
                   the_global_environment);
 
   eof_object = make_character(EOF);
-  stdin_stream = make_stream("stdin", FILESTREAM, INPUT);
-  stdout_stream = make_stream("stdout", FILESTREAM, OUTPUT);
-  define_variable(make_symbol("*stdin*"),
+  stdin_stream = make_file_stream("stdin", INPUT);
+  stdout_stream = make_file_stream("stdout", OUTPUT);
+  stdin_symbol = make_symbol("*stdin*");
+  stdout_symbol = make_symbol("*stdout*");
+  define_variable(stdin_symbol,
                   stdin_stream,
                   the_global_environment);
-  define_variable(make_symbol("*stdout*"),
+  define_variable(stdout_symbol,
                   stdout_stream,
                   the_global_environment);
   
@@ -967,7 +989,8 @@ void init() {
   add_procedure("write", write_proc);
   add_procedure("global-env", global_environment_proc);
 
-  add_procedure("make-stream", make_stream_proc);
+  add_procedure("make-file-stream", make_file_stream_proc);
+  add_procedure("make-socket-stream", make_socket_stream_proc);
   add_procedure("close-stream", close_stream_proc);
 }
 
@@ -1007,15 +1030,17 @@ void eat_whitespace(FILE *in) {
   }
 }
 
-object *read(object *in_stream);
+object *read(object *in_stream, object *env);
 
-object *read_pair(object *in_stream) {
+object *read_pair(object *in_stream, object *env) {
   FILE *in;
   int c;
 
   object *first_obj;
   object *rest_obj;
 
+  if(in_stream == stdin_stream)
+    in_stream = eval(stdin_symbol, env);
   in = in_stream->data.stream.fp;
 
   eat_whitespace(in);
@@ -1025,7 +1050,7 @@ object *read_pair(object *in_stream) {
     return nil;
   ungetc(c, in);
   
-  first_obj = read(in_stream);
+  first_obj = read(in_stream, env);
 
   eat_whitespace(in);
 
@@ -1036,7 +1061,7 @@ object *read_pair(object *in_stream) {
       fprintf(stderr,"Dot not followed by delimiter.\n");
       exit(1);
     }
-    rest_obj = read(in_stream);
+    rest_obj = read(in_stream, env);
     eat_whitespace(in);
     c = getc(in);
     if (c != ')') {
@@ -1047,12 +1072,12 @@ object *read_pair(object *in_stream) {
   }
   else {
     ungetc(c, in);
-    rest_obj = read_pair(in_stream);
+    rest_obj = read_pair(in_stream, env);
     return cons(first_obj, rest_obj);
   }
 }
 
-object *read(object *in_stream) {
+object *read(object *in_stream, object *env) {
   FILE *in;
   int c;
   int i;
@@ -1060,6 +1085,9 @@ object *read(object *in_stream) {
   long num = 0;
   char character;
   char buffer[BUFFER_MAX];
+
+  if(in_stream == stdin_stream)
+    in_stream = eval(stdin_symbol, env);
   
   in = in_stream->data.stream.fp;
 
@@ -1184,24 +1212,24 @@ object *read(object *in_stream) {
   }
   //read a pair
   else if(c == '(') {
-    return read_pair(in_stream);
+    return read_pair(in_stream, env);
   }
   //read a quoted expression
   else if(c == '\'') {
-    return cons(quote_symbol, cons(read(in_stream), nil));
+    return cons(quote_symbol, cons(read(in_stream,env), nil));
   }
   //read a backquoted expression
   else if(c == '`') {
-    return cons(backquote_symbol, cons(read(in_stream), nil));
+    return cons(backquote_symbol, cons(read(in_stream, env), nil));
   }
   // read an escaped (comma'd) expression
   else if(c == ',') {
     if(peek(in) == '@') {
       c = getc(in);
-      return cons(comma_at_symbol, cons(read(in_stream), nil));
+      return cons(comma_at_symbol, cons(read(in_stream,env), nil));
     }
     else
-      return cons(comma_symbol, cons(read(in_stream), nil));
+      return cons(comma_symbol, cons(read(in_stream,env), nil));
   }
   else {
     fprintf(stderr, "Bad input: unexpected '%c'\n", c);
@@ -1211,8 +1239,18 @@ object *read(object *in_stream) {
 
 object *read_proc(object *args) {
   assert( is_list(args) );
-  assert( is_stream(car(args)) );
-  return read(car(args));
+  object *env;
+  object *ins;
+  env = car(args);
+  if( is_nil(cdr(args)) ) {
+    ins = eval(make_symbol("*stdin*"), env);
+  }
+  else {
+    ins = cadr(args);
+  }
+
+  assert( is_stream(ins) );
+  return read(ins,env);
 }
   
 /********/
@@ -1438,7 +1476,7 @@ object *rest_operands(object *ops) {
   return cdr(ops);
 }
 
-object *eval(object *exp, object *env);
+
 object *eval_sequence(object *exps, object *env) {
   assert( is_list(exps) );
   while(!is_last_exp(exps)) {
@@ -1751,6 +1789,10 @@ object *eval(object *exp, object *env) {
       }
       else {
         args = list_of_values(args, env);
+        if(is_primitive_proc(proc) &&
+           (proc->data.primitive_proc.fn == write_proc ||
+            proc->data.primitive_proc.fn == read_proc))
+          args = cons(env, args);
         return apply(proc, args);
       }
     }
@@ -1768,29 +1810,33 @@ object *eval(object *exp, object *env) {
 /* print */
 /*********/
 
-void write(object *obj, object *out_stream);
+void write(object *obj, object *out_stream, object *env);
 
-void write_pair(object *cons, object *out_stream) {
+void write_pair(object *cons, object *out_stream, object *env) {
   FILE *out;
   assert( is_list(cons) );
-  
+
+  if(out_stream == stdout_stream)
+    out_stream = eval(stdout_symbol, env);
   out = out_stream->data.stream.fp;
   
-  write(car(cons), out_stream);
+  write(car(cons), out_stream, env);
   if((cdr(cons))->type == CONS) {
     fprintf(out," ");
-    write_pair(cdr(cons), out_stream);
+    write_pair(cdr(cons), out_stream, env);
   }
   else if ( (cdr(cons))->type == NIL)
     return;
   else {
     fprintf(out," . ");
-    write(cdr(cons), out_stream);
+    write(cdr(cons), out_stream, env);
   }
 }
 
-void write(object *obj, object *out_stream) {
+void write(object *obj, object *out_stream, object *env) {
   FILE *out;
+  if(out_stream == stdout_stream)
+    out_stream = eval(stdout_symbol, env);
   out = out_stream->data.stream.fp;
   switch(obj->type) {
   case NIL:
@@ -1813,7 +1859,7 @@ void write(object *obj, object *out_stream) {
     break;
   case CONS:
     fprintf(out,"(");
-    write_pair(obj, out_stream);
+    write_pair(obj, out_stream, env);
     fprintf(out,")");
     break;
   case PRIMITIVE_PROC:
@@ -1835,14 +1881,18 @@ void write(object *obj, object *out_stream) {
 
 object *write_proc(object *args) {
   assert( is_list(args) );
-  object *obj, *out_stream;
+  object *env, *obj, *out_stream;
 
-  obj = car(args);
-  out_stream = cadr(args);
+  env = car(args);
+  obj = cadr(args);
+  if(is_nil(cddr(args)))
+    out_stream = eval(make_symbol("*stdout*"), env);
+  else
+    out_stream = caddr(args);
 
   assert( is_stream(out_stream) );
 
-  write(obj, out_stream);
+  write(obj, out_stream, env);
   fprintf(out_stream->data.stream.fp, "\n");
 
   return t_symbol;
@@ -1854,7 +1904,7 @@ object *write_proc(object *args) {
 
 void read_eval_file(object* in_stream) {
   object *obj;
-  while((obj = read(in_stream)) != eof_object) {
+  while((obj = read(in_stream, the_global_environment)) != eof_object) {
     eval(obj, the_global_environment);
     //write(eval(obj, the_global_environment));
     //printf("\n");
@@ -1863,9 +1913,9 @@ void read_eval_file(object* in_stream) {
 
 void read_eval_print_file(object *in_stream, object *out_stream) {
   object *obj;
-  while((obj = read(in_stream)) != eof_object) {
+  while((obj = read(in_stream, the_global_environment)) != eof_object) {
     //eval(obj, the_global_environment);
-    write(eval(obj, the_global_environment), out_stream);
+    write(eval(obj, the_global_environment), out_stream, the_global_environment);
     printf("\n");
   }
 }
@@ -1873,14 +1923,17 @@ void read_eval_print_file(object *in_stream, object *out_stream) {
 void repl() {
   object *read_lisp_thing;
   object *evaled_lisp_thing;
+  object *out_stream;
   printf("C-c to exit.\n");
+  out_stream = eval(stdout_symbol, the_global_environment);
   while(1) {
-    printf("=> ");
-    read_lisp_thing = read(stdin_stream);
+    fprintf(stdout_stream->data.stream.fp,"=> ");
+    read_lisp_thing = read(stdin_stream, the_global_environment);
     evaled_lisp_thing = eval(read_lisp_thing, the_global_environment);
-    write(evaled_lisp_thing, stdout_stream);
+    write(evaled_lisp_thing, stdout_stream, the_global_environment);
     //write(eval(read(stdin), the_global_environment));
-    printf("\n");
+    out_stream = eval(stdout_symbol, the_global_environment);
+    fprintf(out_stream->data.stream.fp,"\n");
   }
 }
 
@@ -1896,8 +1949,8 @@ int main() {
   
   printf("Bootstrapping iota...\n");
   //bootstrap_code = fopen(bootstrap_code_fname,"r");
-  bootstrap_stream = make_stream(bootstrap_code_fname, FILESTREAM, INPUT);
-  read_eval_print_file(bootstrap_stream, stdout_stream);
+  bootstrap_stream = make_file_stream(bootstrap_code_fname, INPUT);
+  read_eval_file(bootstrap_stream);
   //fclose(bootstrap_code);
   close_stream(bootstrap_stream);
 

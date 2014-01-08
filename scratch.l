@@ -150,3 +150,7 @@
   (cadr form))
 
 ((nil? ,'(cdr args)) ,(car args))
+`((set! *stdout* ,stream)
+	  ,@body
+	  (set! *stdout* *stdout-std*)))
+  
