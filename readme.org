@@ -1,0 +1,6 @@
+* iota
+Iota is a lisp interpreter.
+
+** Acknowledgements
+Big chunks of iota were built based on Peter Michaux's excellent
+[[http://michaux.ca/articles/scheme-from-scratch-introduction][Scheme from Scratch]] series and Abelson and Sussman's classic [[http://mitpress.mit.edu/sicp/][SICP]].
