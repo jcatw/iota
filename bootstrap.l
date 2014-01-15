@@ -43,18 +43,6 @@
   (if (nil? (cdr args)) (car args)
       `(cond (,(car args) t)
 	     (else (or ,@(cdr args))))))
-
-(define (thing)
-  (let ((y '(1 2 3)))
-    (define (z a b)
-      (cons a (cons b y)))
-    (define (r a)
-      (set-cdr! y a))
-    (define (dispatch m)
-      (cond ((eq? m :z) z)
-	    ((eq? m :r) r)
-	    ((eq? m :y) y)))
-    dispatch))
   
 (define (make-table)
   (define (assoc key recrds)
