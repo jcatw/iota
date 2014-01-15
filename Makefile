@@ -1,4 +1,4 @@
-CC = gcc -Wall
+CC = gcc
 CFLAGS = -lm
 DEBUGFLAGS = -g -ggdb
 LDFLAGS = -lm
@@ -10,8 +10,8 @@ DEPEND_DEFINES =
 srcdir = 
 INCLUDES = -I$(srcdir)
 
-SRCS = iota.c
-OBJS = iota.o
+SRCS = iota-bootstrap.c
+OBJS = iota-bootstrap.o
 EXE = iota
 
 HDRS = 

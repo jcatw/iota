@@ -94,6 +94,7 @@ object *if_symbol;
 object *cond_symbol;
 object *else_symbol;
 object *lambda_symbol;
+object *let_symbol;
 object *begin_symbol;
 object *macro_symbol;
 object *rest_keyword;
@@ -115,6 +116,7 @@ object *cons(object *first, object *rest);
 #define cdr(X) ((X)->data.cons.rest)
 #define caar(X) (car(car(X)))
 #define caaar(X) (car(car(car(X))))
+#define cadar(X) (car(cdr(car(X))))
 #define cddr(X) (cdr(cdr(X)))
 #define cdddr(X) (cdr(cdr(cdr(X))))
 #define cadr(X) (car(cdr(X)))
@@ -509,6 +511,18 @@ object *string_to_number_proc(object *args, object *env) {
   }
 }
 
+object *concat_proc(object *args, object *env) {
+  assert( is_list(args) );
+  char new_string[BUFFER_MAX];
+  object *strobj1, *strobj2;
+  strobj1 = car(args);
+  strobj2 = cadr(args);
+
+  strcpy(new_string, strobj1->data.string.value);
+  strcat(new_string, strobj2->data.string.value);
+  return make_string(new_string);
+}
+
 object *symbol_to_string_proc(object *args, object *env) {
   assert( is_list(args) );
   assert( is_symbol(car(args)) );
@@ -900,6 +914,7 @@ void init() {
   cond_symbol = make_symbol("cond");
   else_symbol = make_symbol("else");
   lambda_symbol = make_symbol("lambda");
+  let_symbol = make_symbol("let");
   begin_symbol = make_symbol("begin");
   macro_symbol = make_symbol("macro");
   rest_keyword = make_keyword(":rest");
@@ -947,6 +962,8 @@ void init() {
   add_procedure("string->number" , string_to_number_proc );
   add_procedure("symbol->string" , symbol_to_string_proc );
   add_procedure("string->symbol" , string_to_symbol_proc );
+
+  add_procedure("strcat", concat_proc);
 
   add_procedure("+" , add_proc             );
   add_procedure("-" , subtract_proc        );
@@ -1241,7 +1258,7 @@ object *read_proc(object *args, object *env) {
 /********/
 
 char is_self_evaluating(object *obj) {
-  return is_keyword(obj) || is_fixnum(obj) || is_character(obj) || is_string(obj);
+  return is_nil(obj) || is_keyword(obj) || is_fixnum(obj) || is_character(obj) || is_string(obj);
 }
 
 char is_variable(object *exp) {
@@ -1531,6 +1548,8 @@ object *parse_params(object *params) {
   return reverse(cleaned_params);
 }
 
+void write(object *obj, object *out_stream, object *env);
+
 object *apply(object *proc, object *args, object *env) {
   assert( is_list(args) );
   object *exp;
@@ -1549,6 +1568,8 @@ object *apply(object *proc, object *args, object *env) {
                            proc->data.compound_proc.env));
   }
   else {
+    write(proc, stdout_stream, env);
+    write(args, stdout_stream, env);
     error("Unknown procedure type");
   }
 }
@@ -1569,6 +1590,9 @@ object *macroexpand(object *proc, object *args) {
                                     parsed_args,
                                     proc->data.macro.env));
   }
+  //else if(proc->data.macro.expanded) {
+  //  expanded_body = body;
+  //}
   else {
     error("Macro not found.");
   }
@@ -1690,6 +1714,32 @@ object *prepare_args_for_apply(object *args) {
   return cons(car(args), prepare_args_for_apply(cdr(args)));
 }
 
+object *cars_of_list(object *list) {
+  return is_nil(list) ? nil : cons(caar(list), cars_of_list(cdr(list)));
+}
+
+object *cadrs_of_list(object *list) {
+  return is_nil(list) ? nil : cons(cadar(list), cadrs_of_list(cdr(list)));
+}
+
+char is_let(object *exp) {
+  return is_tagged_list(exp, let_symbol);
+}
+
+object *let_to_combination(object *let_exp) {
+  object *bindings;
+  object *vars;
+  object *exps;
+  object *body;
+
+  bindings = cadr(let_exp);
+  vars = cars_of_list(bindings);
+  exps = cadrs_of_list(bindings);
+  body = cddr(let_exp);
+
+  return cons(make_lambda(vars, body), exps);
+}
+
 object *eval(object *exp, object *env) {
   object *proc, *args;
   while(1) {
@@ -1716,6 +1766,9 @@ object *eval(object *exp, object *env) {
     }
     else if (is_cond(exp)) {
       exp = cond_to_if(exp);
+    }
+    else if (is_let(exp)) {
+      exp = let_to_combination(exp);
     }
     else if (is_begin(exp)) {
       return eval_sequence(begin_actions(exp), env);
@@ -1766,7 +1819,7 @@ object *eval(object *exp, object *env) {
 /* print */
 /*********/
 
-void write(object *obj, object *out_stream, object *env);
+
 
 void write_pair(object *cons, object *out_stream, object *env) {
   FILE *out;
@@ -1838,12 +1891,11 @@ object *write_proc(object *args, object *env) {
   //object *env;
   object *obj, *out_stream;
 
-  env = car(args);
-  obj = cadr(args);
-  if(is_nil(cddr(args)))
+  obj = car(args);
+  if(is_nil(cdr(args)))
     out_stream = eval(make_symbol("*stdout*"), env);
   else
-    out_stream = caddr(args);
+    out_stream = cadr(args);
 
   assert( is_stream(out_stream) );
 

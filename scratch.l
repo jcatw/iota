@@ -154,3 +154,26 @@
 	  ,@body
 	  (set! *stdout* *stdout-std*)))
   
+(define let
+  (macro (assignments :rest body)
+    `((lambda ,(map car assignments)
+	,@body)
+      ,@(map cadr assignments))))
+(define (make-table-x)
+  (let ((table (list '*table*)))
+    (define (assoc key rec)
+      (cond ((nil? rec) rec)
+	    ((eq? key (caar rec)) (car rec))
+	    (else (assoc key (cdr rec)))))
+    (define (lookup key1 key2)
+      (let ((subtable (assoc key1 (cdr table))))
+	(if subtable
+	    (assoc key2 (cdr subtable))
+	  nil)))
+    (define (insert key1 key2 value)
+      (set-cdr! (lookup key1 key2) value))
+    (define (dispatch m)
+      (cond ((eq? m :lookup) lookup)
+	    ((eq? m :insert) insert)
+	    ((eq? m :inspect) (lambda () table))))
+    dispatch))
