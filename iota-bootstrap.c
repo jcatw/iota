@@ -87,6 +87,7 @@ object *keyword_table;
 object *quote_symbol;
 object *backquote_symbol;
 object *comma_symbol;
+object *pipe_symbol;
 object *comma_at_symbol;
 object *define_symbol;
 object *set_symbol;
@@ -907,6 +908,7 @@ void init() {
   quote_symbol = make_symbol("quote");
   backquote_symbol = make_symbol("backquote");
   comma_symbol = make_symbol("comma");
+  pipe_symbol = make_symbol("pipe");
   comma_at_symbol = make_symbol("comma-at");
   define_symbol = make_symbol("define");
   set_symbol = make_symbol("set!");
@@ -1230,6 +1232,11 @@ object *read(object *in_stream, object *env) {
     }
     else
       return cons(comma_symbol, cons(read(in_stream,env), nil));
+  }
+  // read a evaler'd (|'d) expression
+  else if(c == '|') {
+    return cons(pipe_symbol, cons(read(in_stream,env), nil));
+    //return eval( read(in_stream, env), env);
   }
   else {
     sprintf(error_msg, "Bad input: unexpected '%c'", c);
@@ -1726,6 +1733,10 @@ char is_let(object *exp) {
   return is_tagged_list(exp, let_symbol);
 }
 
+char is_piped(object *exp) {
+  return is_tagged_list(exp, pipe_symbol);
+}
+
 object *let_to_combination(object *let_exp) {
   object *bindings;
   object *vars;
@@ -1754,6 +1765,9 @@ object *eval(object *exp, object *env) {
     }
     else if (is_backquoted(exp)) {
       return eval_backquoted(text_of_quotation(exp), env);
+    }
+    else if (is_piped(exp)) {
+      exp = eval(text_of_quotation(exp), env);
     }
     else if (is_assignment(exp)) {
       return eval_assignment(exp, env);

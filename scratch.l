@@ -177,3 +177,63 @@
 	    ((eq? m :insert) insert)
 	    ((eq? m :inspect) (lambda () table))))
     dispatch))
+
+
+
+(defmacro defn
+  (fn-name fn-args :rest fn-body)
+  (with-gensyms (fn-name fn-args fn-body)
+		`(define (,fn-name ,@fn-args)
+		   ,@fn-body)))
+
+
+(cond ((null? l) nil)
+	((atom? l) (eq? l item))
+	(else (or (contains? (car l) item)
+		  (contains? (cdr l) item))))
+(define (replace from to l)
+  (cond ((null? l) nil)
+	((atom? l) (if (eq? l from) to l))
+	(else (cons (replace from to (car l))
+		    (replace from to (cdr l))))))
+
+(define with-gensyms
+  (macro (symbols->gensyms :rest body)
+    (let ((bindings (map (lambda (sym) (list (gensym) ,sym)) symbols->gensyms)))
+      (let ((sgnidnib (map snoc bindings)))
+	`(let ,bindings
+	   ,@(replace-many `,sgnidnib `,body))))))
+
+(with-gensyms
+ (macro-name macro-args macro-body)
+ (define defmacro
+   (macro (macro-name macro-args :rest macro-body)
+     `(define ,macro-name (macro ,macro-args ,@macro-body)))))
+
+(with-gensyms
+ (fn-name fn-args fn-body)
+ (define defn
+   (macro (fn-name fn-args :rest fn-body)
+     `(define (,fn-name ,@fn-args)
+	,@fn-body))))
+
+(with-gensyms
+ (macro-name macro-args macro-body)
+ (define defmacro
+   (macro (macro-name macro-args :rest macro-body)
+     `(define ,macro-name (macro ,macro-args ,@macro-body)))))
+(define defmacro
+  (let ((macro-name (gensym))
+	(macro-args (gensym))
+	(macro-body (gensym)))
+    (macro (|macro-name |macro-args :rest |macro-body)
+      `(define ,|macro-name
+	 (macro ,|macro-args ,@|macro-body)))))
+
+(define defmacro
+  (let ((macro-name (gensym))
+	(macro-args (gensym))
+	(macro-body (gensym)))
+    (macro (|macro-name |macro-args :rest |macro-body)
+      `(define ,|macro-name
+	 (macro ,|macro-args ,@|macro-body)))))
