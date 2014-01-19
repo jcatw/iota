@@ -69,7 +69,7 @@
 (define *gensym-counter* 0)
 (define (gensym)
   (set! *gensym-counter* (inc *gensym-counter*))
-  (string->symbol (strcat "gensym-" (number->string *gensym-counter*))))
+  (string->symbol (strcat (strcat "-gensym-" (number->string *gensym-counter*)) "-")))
 
 (define with-gensyms
   (macro (names :rest body)
@@ -123,8 +123,6 @@
             (else (error "Unknown table op"))))
     dispatch))
 
-
-
 (define (last-exp? seq)
   (null? (cdr seq)))
 
@@ -143,30 +141,30 @@
   (macro (:rest fs)
     `(lambda (x) ,(nest-fns fs 'x))))
 
-(defmacro writing-to
-  (stream :rest body)
+(define writing-to
+  (macro (stream :rest body)
   `(let ((*stdout* ,stream))
-     ,@body))
+     ,@body)))
 
-(defmacro writing-to-file
-  (file-name :rest body)
+(define writing-to-file
   (with-gensyms (stream)
+  (macro (file-name :rest body)
   `(let ((,stream (make-file-stream ,file-name :output)))
      (let ((*stdout* ,stream))
        ,@body)
-     (close-stream ,stream))))
+     (close-stream ,stream)))))
 
-(defmacro reading-from
-  (stream :rest body)
+(define reading-from
+  (macro (stream :rest body)
   `(let ((*stdin* ,stream))
-     ,@body))
+     ,@body)))
 
-(defmacro reading-from-file
-  (file-name :rest body)
+(define reading-from-file
   (with-gensyms (stream)
+  (macro (file-name :rest body)
    `(let ((,stream (make-file-stream ,file-name :input)))
       (let ((*stdin* ,stream))
 	,@body)
-      (close-stream ,stream))))
+      (close-stream ,stream)))))
   
 "End bootstrap.l"

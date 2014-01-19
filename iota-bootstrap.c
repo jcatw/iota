@@ -1248,12 +1248,12 @@ object *read_proc(object *args, object *env) {
   assert( is_list(args) );
   //object *env;
   object *ins;
-  env = car(args);
-  if( is_nil(cdr(args)) ) {
+  //env = car(args);
+  if( is_nil(args) ) {
     ins = eval(make_symbol("*stdin*"), env);
   }
   else {
-    ins = cadr(args);
+    ins = car(args);
   }
 
   assert( is_stream(ins) );
