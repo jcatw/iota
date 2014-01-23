@@ -166,5 +166,10 @@
       (let ((*stdin* ,stream))
 	,@body)
       (close-stream ,stream)))))
+
+(define defn
+  (macro (fn-name fn-args :rest fn-body)
+    `(begin (define (internal-fn-sym ,@fn-args) ,@fn-body)
+	    (eval `(define ,,fn-name ',internal-fn-sym) (global-env)))))
   
 "End bootstrap.l"

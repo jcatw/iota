@@ -237,3 +237,14 @@
     (macro (|macro-name |macro-args :rest |macro-body)
       `(define ,|macro-name
 	 (macro ,|macro-args ,@|macro-body)))))
+
+(define defn
+  (macro (fn-name fn-args :rest fn-body)
+    `(let ((fn (define (,fn-name ,@fn-args)
+		 ,@fn-body)))
+	   (eval '(define ,fn-name fn) (global-env)))))
+
+(define defn
+  (macro (fn-name fn-args :rest fn-body)
+    `(let ((fn (lambda ,fn-args ,@fn-body)))
+       (eval `(define ,,fn-name ',fn) (global-env)))))

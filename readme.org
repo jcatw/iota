@@ -1,6 +1,51 @@
 * iota
-Iota is a lisp interpreter.
+Iota is a lisp interpreter.  It is very much a work in progress.
+
+build:
+#+begin_src sh
+make
+#+end_src
+
+run:
+#+begin_src sh
+./iota
+#+end_src
+
+** What it has
+   + Interpretation.
+   + Lisp-1 namespacing.
+   + Lexical binding.
+   + Common Lisp-style macros.
+   + Self-evaluating keywords.
+   + Some arg parsing.
+   + Some introspection.
+   + Decent I/O.
+
+** What it doesn't have
+   + Booleans (nil serves as false)
+   + Garbage collection.
+
+** What I want it to have
+   + Self-hosted compilation, maybe to some kind of iota bytecode, maybe to javascript, maybe to C, maybe to all three.
+   + Much more introspection.
+   + Better arg parsing.
+   + More (fast) fundamental data structures, like maps/hashtables/dictionaries and resizable vectors.
+   + Garbage collection.
 
 ** Acknowledgements
-Big chunks of iota were built based on Peter Michaux's excellent
-[[http://michaux.ca/articles/scheme-from-scratch-introduction][Scheme from Scratch]] series and Abelson and Sussman's classic [[http://mitpress.mit.edu/sicp/][SICP]].
+Big chunks of iota were built based on Peter Michaux's [[http://michaux.ca/articles/scheme-from-scratch-introduction][Scheme from
+Scratch]] series, which walks through a C implementation of the
+metacircular scheme intepreter in [[http://mitpress.mit.edu/sicp/][SICP]].  Other stuff was built by
+reading [[http://mitpress.mit.edu/sicp/][SICP]] directly.  I am also working through Lisp in Small
+Pieces, so that will probably show up.  Still other stuff I just
+hacked out.  Some of it is broken, see below.
+
+** Inspiration
+   + [[https://code.google.com/p/femtolisp/][femtolisp]]
+   + [[http://piumarta.com/software/maru/][maru]]
+
+** Broken / TODO
+   + Quasiquote (backquote) doesn't nest right
+   + Variable capture seems to be happening a lot, maybe because quasiquote is broken, or maybe just inherent to common lisp macros in a lisp-1.
+   + Socket streams are broken and will probably be taken out.
+
