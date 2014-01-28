@@ -45,6 +45,6 @@ hacked out.  Some of it is broken, see below.
    + [[http://piumarta.com/software/maru/][maru]]
 
 ** Broken / TODO
-   + Quasiquote (backquote) doesn't nest right
-   + Variable capture seems to be happening a lot, maybe because quasiquote is broken, or maybe just inherent to common lisp macros in a lisp-1.
+   + +Quasiquote (backquote) doesn't nest right+ backquote should work now
+   + Variable capture seems to be happening a lot, +maybe because quasiquote is broken, or+ maybe just inherent to common lisp macros in a lisp-1.
 

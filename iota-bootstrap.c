@@ -1594,20 +1594,28 @@ object *eval_sequence_head(object *exp, object *env) {
   return cons(head,this);
 }
 
-object *eval_backquoted(object *exp, object *env) {
+object *maybe_eval_backquoted(object *exp, object *env, int backquote_depth);
+      
+object *eval_backquoted(object *exp, object *env, int backquote_depth) {
   object *thing_to_splice;
   object *head;
   object *this;
   object *cdr_eval;
   if(is_escaped(exp)) {
-    return eval(text_of_quotation(exp), env);
+    //return eval(text_of_quotation(exp), env);
+    return maybe_eval_backquoted(text_of_quotation(exp), env, --backquote_depth);
+  }
+  if(is_backquoted(exp)) {
+    return eval_backquoted(text_of_quotation(exp), env, ++backquote_depth);
   }
   else if(is_cons(exp)) {
     if (is_spliced(car(exp))) {
       thing_to_splice = text_of_quotation(car(exp));
-      head = eval(thing_to_splice, env);
+      //head = eval(thing_to_splice, env);
+      head = maybe_eval_backquoted(thing_to_splice, env, --backquote_depth);
       if(is_nil(head)) {
-        return eval_backquoted(cdr(exp), env);
+        //return eval_backquoted(cdr(exp), env);
+        return eval_backquoted(cdr(exp), env, backquote_depth);
       }
       if(!is_cons(head)) {
         printf("%d\n",thing_to_splice->type);
@@ -1616,19 +1624,27 @@ object *eval_backquoted(object *exp, object *env) {
       this = head;
       while(!is_nil(cdr(this)))
         this = cdr(this);
-      cdr_eval = eval_backquoted(cdr(exp), env);
+      cdr_eval = eval_backquoted(cdr(exp), env, backquote_depth);
       cdr(this) = cdr_eval;
       return head;
     }
     else {
-      return cons(eval_backquoted(car(exp), env),
-                  eval_backquoted(cdr(exp), env));
+      return cons(eval_backquoted(car(exp), env, backquote_depth),
+                  eval_backquoted(cdr(exp), env, backquote_depth));
     }
   }
   else {
     return exp;
   }
 }
+
+object *maybe_eval_backquoted(object *exp, object *env, int backquote_depth) {
+  if(backquote_depth > 0)
+    return eval_backquoted(exp, env, backquote_depth);
+  else
+    return eval(exp, env);
+}
+
 
 object *prepare_args_for_apply(object *args) {
   if(is_nil(cdr(args)))
@@ -1679,7 +1695,7 @@ object *eval(object *exp, object *env) {
       return text_of_quotation(exp);
     }
     else if (is_backquoted(exp)) {
-      return eval_backquoted(text_of_quotation(exp), env);
+      return eval_backquoted(text_of_quotation(exp), env, 1);
     }
     else if (is_piped(exp)) {
       exp = eval(text_of_quotation(exp), env);
