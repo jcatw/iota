@@ -29,8 +29,11 @@ depend:
 	$(DEPEND_FLAGS) -- $(INCLUDES) $(DEFS) $(DEPEND_DEFINES) $(CFLAGS) \
 	-- ${SRCS}
 
+.PHONY: TAGS
+.PHONY: tags
 TAGS: tags
 tags:
+	rm -f TAGS
 	find $(srcdir) -name '*.[chly]' -print | xargs etags -a
 
 .c.o:
