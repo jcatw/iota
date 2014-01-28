@@ -24,8 +24,6 @@ typedef enum {NIL, SYMBOL, KEYWORD,
               CONS, MACRO, PRIMITIVE_PROC,
               COMPOUND_PROC, STREAM} object_type;
 
-typedef enum {FILESTREAM, SOCKETSTREAM} streamtype;
-
 typedef enum {OUTPUT, INPUT} directiontype;
 
 typedef struct object {
@@ -64,10 +62,8 @@ typedef struct object {
       struct object *env;
     } macro;
     struct {
-      streamtype streamtype;
       directiontype directiontype;
       FILE* fp;
-      int fd;
     } stream;
   } data;
 } object;
@@ -259,14 +255,6 @@ char is_stream(object *obj) {
   return obj->type == STREAM;
 }
 
-char is_file_stream(object* obj) {
-  return is_stream(obj) && obj->data.stream.streamtype == FILESTREAM;
-}
-
-char is_socket_stream(object *obj) {
-  return is_stream(obj) && obj->data.stream.streamtype == SOCKETSTREAM;
-}
-
 char is_output_stream(object *obj) {
   return is_stream(obj) && obj->data.stream.directiontype == OUTPUT;
 }
@@ -275,50 +263,34 @@ char is_input_stream(object *obj) {
   return is_stream(obj) && obj->data.stream.directiontype == INPUT;
 }
 
-void init_sockaddr (struct sockaddr_in *name,
-                    const char *hostname,
-                    unsigned short int port) {
-  struct hostent *hostinfo;
-
-  name->sin_family = AF_INET;
-  name->sin_port = htons (port);
-  hostinfo = gethostbyname (hostname);
-  if (hostinfo == NULL) {
-    error("Unknown host.");
-  }
-  name->sin_addr = *(struct in_addr *) hostinfo->h_addr;
-}
-
 object *make_file_stream(char* stream_name, directiontype direction) {
   object *obj;
+  int fd;
 
   obj = alloc_object();
   obj->type = STREAM;
 
-  obj->data.stream.streamtype = FILESTREAM;
   if(strcmp(stream_name, "stdin") == 0 ) {
-    obj->data.stream.fd = 0;
     obj->data.stream.fp = stdin;
     obj->data.stream.directiontype = INPUT;
     return obj;
   }
   if (strcmp(stream_name, "stdout") == 0) {
-    obj->data.stream.fd = 0;
     obj->data.stream.fp = stdout;
     obj->data.stream.directiontype = OUTPUT;
     return obj;
   }
   if (direction == INPUT) {
     obj->data.stream.directiontype = INPUT;
-    obj->data.stream.fd = open(stream_name, O_RDONLY | O_CREAT | O_NONBLOCK, S_IRUSR | S_IWUSR);
-    obj->data.stream.fp = fdopen(obj->data.stream.fd, "r");
+    fd = open(stream_name, O_RDONLY | O_CREAT | O_NONBLOCK, S_IRUSR | S_IWUSR);
+    obj->data.stream.fp = fdopen(fd, "r");
   }
   else {
     obj->data.stream.directiontype = OUTPUT;
-    obj->data.stream.fd = open(stream_name, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
-    obj->data.stream.fp = fdopen(obj->data.stream.fd, "w");
+    fd = open(stream_name, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
+    obj->data.stream.fp = fdopen(fd, "w");
   }
-  if(!obj->data.stream.fd || !obj->data.stream.fp) {
+  if(!fd || !obj->data.stream.fp) {
     error("Could not open file stream.");
   }
   // turn off buffering
@@ -326,52 +298,10 @@ object *make_file_stream(char* stream_name, directiontype direction) {
   return obj;
 }
 
-object *make_socket_stream(char* host_name, int port, directiontype direction) {
-  object *obj;
-  int sock;
-  struct sockaddr_in servername;
-
-  obj = alloc_object();
-  obj->type = STREAM;
-  obj->data.stream.streamtype = SOCKETSTREAM;
-  sock = socket(PF_INET, SOCK_STREAM, 0);
-  init_sockaddr(&servername,host_name,port);  
-  obj->data.stream.fd = sock;
-  if(direction == INPUT) {
-    obj->data.stream.directiontype = INPUT;
-    if (connect(sock, (struct sockaddr *) &servername, sizeof(servername)) < 0) {
-      error("Connection failed.");
-    }
-    obj->data.stream.fp = fdopen(obj->data.stream.fd,"r");
-  }
-  else {
-    obj->data.stream.directiontype = OUTPUT;
-    if (listen(obj->data.stream.fd, CONNECTIONS_MAX) < 0) {
-      error("Could not listen on socket.");
-    }
-    obj->data.stream.fp = fdopen(obj->data.stream.fd,"w");
-  }
-  if(!obj->data.stream.fd || !obj->data.stream.fp) {
-    error("Could not open socket stream.");
-  }
-  // line buffering
-  setvbuf(obj->data.stream.fp, NULL, _IOLBF, BUFFER_MAX);
-  return obj;
-}
 
 void close_stream(object *stream) {
   assert( is_stream(stream) );
-  if(is_file_stream(stream)) {
-    fclose(stream->data.stream.fp);
-    close(stream->data.stream.fd);
-  }
-  else if (is_socket_stream(stream)) {
-    fclose(stream->data.stream.fp);
-    shutdown(stream->data.stream.fd, 2);  //2: stop reception and transmission
-  }
-  else {
-    error("Trying to close unknown stream type.");
-  }
+  fclose(stream->data.stream.fp);
 }
 
 // get length of list
@@ -718,20 +648,6 @@ object *reverse_proc(object *args, object *env) {
   return reverse(car(args));
 }
 
-object *make_socket_stream_proc(object *args, object *env) {
-  assert( is_list(args) );
-  object *name, *dtype, *port;
-  name = car(args);
-  port = cadr(args);
-  dtype = caddr(args);
-  assert( is_string(name) );
-  assert( is_fixnum(port) );
-  assert( is_keyword(dtype) );
-  return make_socket_stream(name->data.string.value,
-                            is_eq(dtype, output_keyword) ? OUTPUT : INPUT,
-                            port->data.fixnum.value);
-}
-
 object *make_file_stream_proc(object *args, object *env) {
   assert( is_list(args) );
   object *name, *dtype;
@@ -994,7 +910,6 @@ void init() {
   add_procedure("global-env"  , global_environment_proc );
 
   add_procedure("make-file-stream"   , make_file_stream_proc   );
-  add_procedure("make-socket-stream" , make_socket_stream_proc );
   add_procedure("close-stream"       , close_stream_proc       );
 }
 

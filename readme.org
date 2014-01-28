@@ -47,5 +47,4 @@ hacked out.  Some of it is broken, see below.
 ** Broken / TODO
    + Quasiquote (backquote) doesn't nest right
    + Variable capture seems to be happening a lot, maybe because quasiquote is broken, or maybe just inherent to common lisp macros in a lisp-1.
-   + Socket streams are broken and will probably be taken out.
 
