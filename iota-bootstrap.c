@@ -1607,7 +1607,7 @@ object *eval_backquoted(object *exp, object *env) {
       thing_to_splice = text_of_quotation(car(exp));
       head = eval(thing_to_splice, env);
       if(is_nil(head)) {
-        error("Attempt to splice in nil.");
+        return eval_backquoted(cdr(exp), env);
       }
       if(!is_cons(head)) {
         printf("%d\n",thing_to_splice->type);
