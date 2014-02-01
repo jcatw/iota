@@ -14,7 +14,7 @@ SRCS = iota-bootstrap.c
 OBJS = iota-bootstrap.o
 EXE = iota
 
-HDRS = 
+HDRS = iota-bootstrap.h
 
 all: debug
 

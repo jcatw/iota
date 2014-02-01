@@ -7,6 +7,8 @@
 #include <netinet/in.h>
 #include <netdb.h>
 
+#include "iota-bootstrap.h"
+
 #ifndef BUFFER_MAX
 #define BUFFER_MAX 1024
 #endif
@@ -18,13 +20,6 @@
 /************/
 /* language */
 /************/
-
-typedef enum {NIL, SYMBOL, KEYWORD,
-              FIXNUM, CHARACTER, STRING,
-              CONS, MACRO, PRIMITIVE_PROC,
-              COMPOUND_PROC, STREAM} object_type;
-
-typedef enum {OUTPUT, INPUT} directiontype;
 
 typedef struct object {
   object_type type;
@@ -75,53 +70,6 @@ object *alloc_object() {
   if(!obj) return 0;
   return obj;
 }
-
-object *nil;
-object *t_symbol;
-object *symbol_table;
-object *keyword_table;
-object *quote_symbol;
-object *backquote_symbol;
-object *comma_symbol;
-object *pipe_symbol;
-object *comma_at_symbol;
-object *define_symbol;
-object *set_symbol;
-object *if_symbol;
-object *cond_symbol;
-object *else_symbol;
-object *lambda_symbol;
-object *let_symbol;
-object *begin_symbol;
-object *macro_symbol;
-object *rest_keyword;
-
-object *eof_object;
-object *stdin_stream;
-object *stdout_stream;
-object *stdin_symbol;
-object *stdout_symbol;
-
-object *output_keyword;
-object *input_keyword;
-
-object *the_empty_environment;
-object *the_global_environment;
-
-object *cons(object *first, object *rest);
-#define car(X) ((X)->data.cons.first)
-#define cdr(X) ((X)->data.cons.rest)
-#define caar(X) (car(car(X)))
-#define caaar(X) (car(car(car(X))))
-#define cadar(X) (car(cdr(car(X))))
-#define cddr(X) (cdr(cdr(X)))
-#define cdddr(X) (cdr(cdr(cdr(X))))
-#define cadr(X) (car(cdr(X)))
-#define cdar(X) (cdr(car(X)))
-#define cdadr(X) (cdr(car(cdr(X))))
-#define caddr(X) (car(cdr(cdr(X))))
-#define cadddr(X) (car(cdr(cdr(cdr(X)))))
-#define caadr(X) (car(car(cdr(X))))
 
 void error(char *msg) {
   fprintf(stderr,"%s\n",msg);
@@ -800,18 +748,6 @@ object *global_environment_proc(object *args, object *env) {
   return the_global_environment;
 }
 
-object *macroexpand_proc(object *exps, object *env);
-object *apply_proc(object *args, object *env);
-object *eval_proc(object *args, object *env);
-object *read_proc(object *args, object *env);
-object *write_proc(object *args, object *env);
-
-object *eval(object *exp, object *env);
-
-#define add_procedure(scheme_name, c_name)      \
-  define_variable(make_symbol(scheme_name),     \
-                  make_primitive_proc(c_name),  \
-                  the_global_environment);
 
 void init() {
   nil = alloc_object();
@@ -948,8 +884,6 @@ void eat_whitespace(FILE *in) {
     break;
   }
 }
-
-object *read(object *in_stream, object *env);
 
 object *read_pair(object *in_stream, object *env) {
   FILE *in;
@@ -1222,8 +1156,6 @@ object *definition_variable(object *exp) {
     return caadr(exp);
 }
 
-object *make_lambda(object *params, object *body);
-
 object *definition_value(object *exp) {
   assert( is_list(exp) );
   if(is_symbol(cadr(exp)))
@@ -1392,7 +1324,6 @@ object *rest_operands(object *ops) {
   return cdr(ops);
 }
 
-
 object *eval_sequence(object *exps, object *env) {
   assert( is_list(exps) );
   while(!is_last_exp(exps)) {
@@ -1469,8 +1400,6 @@ object *parse_params(object *params) {
   }
   return reverse(cleaned_params);
 }
-
-void write(object *obj, object *out_stream, object *env);
 
 object *apply(object *proc, object *args, object *env) {
   assert( is_list(args) );
@@ -1593,8 +1522,6 @@ object *eval_sequence_head(object *exp, object *env) {
   }
   return cons(head,this);
 }
-
-object *maybe_eval_backquoted(object *exp, object *env, int backquote_depth);
       
 object *eval_backquoted(object *exp, object *env, int backquote_depth) {
   object *thing_to_splice;
@@ -1644,7 +1571,6 @@ object *maybe_eval_backquoted(object *exp, object *env, int backquote_depth) {
   else
     return eval(exp, env);
 }
-
 
 object *prepare_args_for_apply(object *args) {
   if(is_nil(cdr(args)))
@@ -1763,8 +1689,6 @@ object *eval(object *exp, object *env) {
 /*********/
 /* print */
 /*********/
-
-
 
 void write_pair(object *cons, object *out_stream, object *env) {
   FILE *out;
