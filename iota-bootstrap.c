@@ -13,8 +13,8 @@
 #define BUFFER_MAX 1024
 #endif
 
-#ifndef CONNECTIONS_MAX
-#define CONNECTIONS_MAX 1024
+#ifndef NDEBUG
+#define DEBUG 1
 #endif
 
 /************/
@@ -23,6 +23,11 @@
 
 typedef struct object {
   object_type type;
+  char mark;
+  #ifdef DEBUG
+  int gc_count;
+  int alloc_count;
+  #endif
   union {
     struct {
       char *value;
@@ -61,14 +66,131 @@ typedef struct object {
       FILE* fp;
     } stream;
   } data;
+  struct object *next;
 } object;
 
-object *alloc_object() {
-  object *obj;
+typedef struct object_stack {
+  object **obj;
+  struct object_stack *next;
+} object_stack;
 
+//allocate a persistent object (ie can not be gc'd)
+object *alloc_persistent_object() {
+  object *obj;
   obj = (object *) malloc(sizeof(object));
   if(!obj) return 0;
+  obj->mark = 1;
+  obj->next = NULL;
   return obj;
+}
+
+//allocate an object off the heap
+//(heap objects can be gc'd)
+object *alloc_object() {
+  object *free_object;
+  object *active_object_head;
+
+  // get a free object
+  free_object = get_free_object();
+  if(free_object == NULL) {
+    // if none left, gc and try again
+    gc();
+    free_object = get_free_object();
+    // if still none left, we are out of memory
+    if(free_object == NULL) {
+      error("Out of memory.");
+    }
+  }
+  #ifdef DEBUG
+  free_object->alloc_count++;
+  #endif
+  // the free object is now active (no longer free)
+  // put it at the head of the active list
+  free_object->next = active_list;
+  active_list = free_object;
+  return free_object;
+}
+
+#define N_ROOT_OBJECTS 8
+
+void gc() {
+  int i;
+  object *root_objects[N_ROOT_OBJECTS]= {nil,
+                                         the_global_environment,
+                                         the_empty_environment,
+                                         symbol_table,
+                                         keyword_table,
+                                         stdin_stream,
+                                         stdout_stream,
+                                         eof_object};
+  object *iterator;
+  object *next;
+  object_stack *stack;
+  object *old_free_list;
+  object *free_ptr;
+  object *prev;
+  int n_objects_marked = 0;
+  int n_objects_swept = 0;
+  #ifdef DEBUG
+  fprintf(stderr,"gc...\n");
+  fprintf(stderr,"mark...\n");
+  #endif
+  // mark
+  for(i=0; i<N_ROOT_OBJECTS; i++) {
+    n_objects_marked += mark(root_objects[i]);
+  }
+  stack = stack_roots;
+  while(stack != NULL) {
+    n_objects_marked += mark(*(stack->obj));
+    stack = stack->next;
+  }
+  #ifdef DEBUG
+  fprintf(stderr,"%d items marked.\n",n_objects_marked);
+  fprintf(stderr,"sweep...\n");
+  #endif
+  //sweep
+  iterator = active_list;
+  prev = NULL;
+  while(!(iterator == NULL)) {
+    if(!iterator->mark) {
+      //iterator->mark = 0;
+      n_objects_swept++;
+      #ifdef DEBUG
+      iterator->gc_count++;
+      #endif
+      if(is_string(iterator))
+        free(iterator->data.string.value);
+      else if(is_symbol(iterator))
+        free(iterator->data.symbol.value);
+      else if(is_keyword(iterator))
+        free(iterator->data.keyword.value);
+      next = iterator->next;
+      old_free_list = free_list;
+      free_list = iterator;
+      prev->next = next;
+      free_list->next = old_free_list;
+      iterator = next;
+    }
+    else {
+      iterator->mark = 0;
+      prev = iterator;
+      iterator = iterator->next;
+    }
+  }
+  #ifdef DEBUG
+  fprintf(stderr,"%d items swept.\n",n_objects_swept);
+  assert( (n_objects_marked + n_objects_swept) == N_HEAP);
+  #endif
+}
+
+int mark(object *obj) {
+  int count = 1 - obj->mark;
+  obj->mark = 1;
+  if(is_cons(obj)) {
+    return count + mark(car(obj)) + mark(cdr(obj));
+  }
+  else
+    return count;
 }
 
 void error(char *msg) {
@@ -96,9 +218,11 @@ object *make_symbol(char *value) {
   obj = alloc_object();
   obj->type = SYMBOL;
   obj->data.symbol.value = (char *) malloc(strlen(value) + 1);
+  push_stack_root(&obj);
   if(!obj->data.symbol.value) return 0;
   strcpy(obj->data.symbol.value, value);
   symbol_table = cons(obj, symbol_table);
+  pop_stack_root();
   return obj;
 }
 
@@ -118,10 +242,12 @@ object *make_keyword(char *value) {
   obj = alloc_object();
   obj->type = KEYWORD;
   obj->data.keyword.value = (char *) malloc(strlen(value) + 1);
+  push_stack_root(&obj);
   if(!obj->data.keyword.value)
     return 0;
   strcpy(obj->data.keyword.value, value);
   keyword_table = cons(obj, keyword_table);
+  pop_stack_root();
   return obj;
 }
 
@@ -583,10 +709,12 @@ object *is_eq_proc(object *args, object *env) {
 object *reverse(object *head) {
   assert( is_list(head) );
   object *new_head = nil;
+  push_stack_root(&new_head);
   while(!is_nil(head)) {
     new_head = cons(car(head), new_head);
     head = cdr(head);
   }
+  pop_stack_root();
   return new_head;
 }
 
@@ -664,15 +792,25 @@ object *frame_values(object *frame) {
 void add_binding_to_frame(object *var,
                           object *val,
                           object *frame) {
-  car(frame) = cons(var, car(frame) );
-  cdr(frame) = cons(val, cdr(frame) );
+  object *result;
+  push_stack_root(&result);
+  result = cons(var, car(frame) );
+  car(frame) = result;
+  result = cons(val, cdr(frame) );  
+  cdr(frame) = result;
+  pop_stack_root();
 }
 
 object *extend_environment(object *vars,
                            object *vals,
                            object *base_env) {
   assert( is_list(base_env) );
-  return cons(make_frame(vars, vals), base_env); 
+  object *result;
+  push_stack_root(&result);
+  result = make_frame(vars, vals);
+  result = cons(result, base_env);
+  pop_stack_root();
+  return result; 
 }
 
 object *lookup_variable_value(object *var, object *env) {
@@ -748,8 +886,69 @@ object *global_environment_proc(object *args, object *env) {
   return the_global_environment;
 }
 
+object *alloc_initial_objects(int n_objects) {
+  int i;
+  object *prev_object;
+  object *current_object;
+
+  //allocate space for n_objects objects and chain them together
+  object *root_object = (object *) malloc(n_objects * sizeof(object));
+  if(!root_object) return 0;
+  root_object->mark = 0;
+  #ifdef DEBUG
+  root_object->gc_count = 0;
+  root_object->alloc_count = 0;
+  #endif
+  
+  current_object = root_object;
+  for(i=1; i<n_objects; i++) {
+    prev_object = current_object;
+    current_object = prev_object + 1;
+    current_object->mark = 0;
+    #ifdef DEBUG
+    current_object->gc_count = 0;
+    current_object->alloc_count = 0;
+    #endif
+    prev_object->next = current_object;
+  }
+  current_object->next = NULL;
+  return root_object;
+}
+
+object *get_free_object() {
+  object *free_object = free_list;
+  if(free_object == NULL)
+    return NULL;
+  free_list = free_list->next;
+  return free_object;
+}
+
+void push_stack_root(object **root) {
+  object_stack *old_stack_head;
+
+  old_stack_head = stack_roots;
+  stack_roots = (object_stack*) malloc( sizeof(object_stack) );
+  stack_roots->obj = root;
+  stack_roots->next = old_stack_head;
+}
+
+object **pop_stack_root() {
+  object_stack *stack_head;
+  object **stack_head_object_ptr;
+
+  stack_head = stack_roots;
+  if (stack_roots == NULL)
+    error("No stack frame to pop.");
+  stack_roots = stack_roots->next;
+  stack_head_object_ptr = stack_head->obj;
+  free(stack_head);
+  return stack_head_object_ptr;
+}
 
 void init() {
+  free_list = alloc_initial_objects(N_HEAP);
+  
+  //nil = alloc_persistent_object();
   nil = alloc_object();
   nil->type = NIL;
 
@@ -886,11 +1085,17 @@ void eat_whitespace(FILE *in) {
 }
 
 object *read_pair(object *in_stream, object *env) {
+  int i;
   FILE *in;
   int c;
 
   object *first_obj;
   object *rest_obj;
+  object *result;
+
+  
+  
+  
 
   if(in_stream == stdin_stream)
     in_stream = eval(stdin_symbol, env);
@@ -904,9 +1109,11 @@ object *read_pair(object *in_stream, object *env) {
   ungetc(c, in);
   
   first_obj = read(in_stream, env);
+  push_stack_root(&first_obj);
 
   eat_whitespace(in);
 
+  
   c = getc(in);
   if (c == '.') {
     c = peek(in);
@@ -914,17 +1121,29 @@ object *read_pair(object *in_stream, object *env) {
       error("Dot not followed by delimiter");
     }
     rest_obj = read(in_stream, env);
+    push_stack_root(&rest_obj);
     eat_whitespace(in);
     c = getc(in);
     if (c != ')') {
       error("Unclosed list.");
     }
-    return cons(first_obj, rest_obj);
+    result = cons(first_obj, rest_obj);
+    push_stack_root(&result);
+    for(i=0;i<3;i++) {
+      pop_stack_root();
+    }  
+    return result;
   }
   else {
     ungetc(c, in);
     rest_obj = read_pair(in_stream, env);
-    return cons(first_obj, rest_obj);
+    push_stack_root(&rest_obj);
+    result = cons(first_obj, rest_obj);
+    push_stack_root(&result);
+    for(i=0;i<3;i++) {
+      pop_stack_root();
+    }
+    return result;
   }
 }
 
@@ -937,6 +1156,7 @@ object *read(object *in_stream, object *env) {
   char character;
   char buffer[BUFFER_MAX];
   char error_msg[BUFFER_MAX];
+  object *result;
 
   if(in_stream == stdin_stream)
     in_stream = eval(stdin_symbol, env);
@@ -1067,24 +1287,45 @@ object *read(object *in_stream, object *env) {
   }
   //read a quoted expression
   else if(c == '\'') {
-    return cons(quote_symbol, cons(read(in_stream,env), nil));
+    push_stack_root(&result);
+    result = cons(read(in_stream, env), nil);
+    result = cons(quote_symbol, result);
+    pop_stack_root();
+    return result;
   }
   //read a backquoted expression
   else if(c == '`') {
-    return cons(backquote_symbol, cons(read(in_stream, env), nil));
+    push_stack_root(&result);
+    result = cons(read(in_stream, env), nil);
+    result = cons(backquote_symbol, result);
+    pop_stack_root();
+    return result;
   }
   // read an escaped (comma'd) expression
   else if(c == ',') {
     if(peek(in) == '@') {
       c = getc(in);
-      return cons(comma_at_symbol, cons(read(in_stream,env), nil));
+      push_stack_root(&result);
+      result = cons(read(in_stream,env), nil);
+      result = cons(comma_at_symbol, result);
+      pop_stack_root();
+      return result;
     }
-    else
-      return cons(comma_symbol, cons(read(in_stream,env), nil));
+    else {
+      push_stack_root(&result);
+      result = cons(read(in_stream,env), nil);
+      result = cons(comma_symbol, result);
+      pop_stack_root();
+      return result;
+    }
   }
   // read a evaler'd (|'d) expression
   else if(c == '|') {
-    return cons(pipe_symbol, cons(read(in_stream,env), nil));
+    push_stack_root(&result);
+    result = cons(read(in_stream,env), nil);
+    result = cons(pipe_symbol, result);
+    pop_stack_root();
+    return result;
     //return eval( read(in_stream, env), env);
   }
   else {
@@ -1188,7 +1429,12 @@ object *if_alternative(object *exp) {
 }
 
 object *make_lambda(object *params, object *body) {
-  return cons(lambda_symbol, cons(params, body));
+  object *result;
+  push_stack_root(&result);
+  result = cons(params, body);
+  result = cons(lambda_symbol, result);
+  pop_stack_root();
+  return result;
 }
 
 char is_lambda(object *exp) {
@@ -1258,7 +1504,14 @@ object *sequence_to_exp(object *seq) {
 object *make_if(object *pred,
                 object *conseq,
                 object *alt) {
-  return cons(if_symbol,cons(pred,cons(conseq,cons(alt, nil))));
+  object *result;
+  push_stack_root(&result);
+  result = cons(alt, nil);
+  result = cons(conseq, result);
+  result = cons(pred, result);
+  result = cons(if_symbol, result);
+  pop_stack_root();
+  return result;
 }
 
 char is_cond(object *exp) {
@@ -1335,12 +1588,19 @@ object *eval_sequence(object *exps, object *env) {
 
 object *list_of_values(object *exps, object *env) {
   assert( is_list(exps) );
+  object *result1, *result2;
   if (is_no_operands(exps)) {
     return nil;
   }
   else {
-    return cons(eval(first_operand(exps), env),
-                list_of_values(rest_operands(exps), env));
+    push_stack_root(&result1);
+    result1 = eval(first_operand(exps), env);
+    push_stack_root(&result2);
+    result2 = list_of_values(rest_operands(exps), env);
+    result1 = cons(result1, result2);
+    pop_stack_root();
+    pop_stack_root();
+    return result1;
   }
 }
 
@@ -1350,11 +1610,13 @@ object *copy_list(object *list) {
   object *new_list;
 
   iterator = list;
+  push_stack_root(&new_list);
   new_list = nil;
   while(!is_nil(iterator)) {
     new_list = cons(car(list), new_list);
     iterator = cdr(iterator);
   }
+  pop_stack_root();
   return reverse(new_list);
 }
 
@@ -1510,17 +1772,23 @@ char is_spliced(object *exp) {
 
 object *eval_sequence_head(object *exp, object *env) {
   assert( is_list(exp) );
-  object *head = cons(eval(car(exp), env), nil);
-  object *this = head;
-  object *next;
+  object *head;
+  object *this;
+  object *result;
+  push_stack_root(&result);
+  result = cons(eval(car(exp), env), nil);
+  head = result;
+  this = head;
   exp = cdr(exp);
   while(!is_nil(exp)) {
-    next = cons(eval(car(exp), env), nil);
-    this->data.cons.rest = next;
-    this = next;
+    result = cons(eval(car(exp), env), nil);
+    this->data.cons.rest = result;
+    this = result;
     exp = cdr(exp);
   }
-  return cons(head,this);
+  result = cons(head,this);
+  pop_stack_root();
+  return result;
 }
       
 object *eval_backquoted(object *exp, object *env, int backquote_depth) {
@@ -1773,6 +2041,55 @@ object *write_proc(object *args, object *env) {
 
   return t_symbol;
 }
+
+void pad(int depth) {
+  int i;
+  for(i=0;i<depth;i++) {
+    printf("\t");
+  }
+}
+
+int print_structure(object *obj, int depth) {
+  int i;
+  switch(obj->type) {
+    case NIL:
+      printf("|/|");
+      break;
+
+    case CONS:
+      printf("|.|");
+      if( is_nil(cdr(obj)) ) {
+          printf("|/|");
+        }
+      else {
+        printf("|.|->\t");
+        print_structure(cdr(obj),++depth);
+      }
+      printf("\n");
+      pad(depth);
+      printf("|\n");
+      pad(depth);
+      printf("v\n");
+      pad(depth);
+      print_structure(car(obj),depth);
+      break;
+    case FIXNUM:
+      pad(depth);
+      printf("%d",obj->data.fixnum.value);
+      break;
+    case SYMBOL:
+      pad(depth);
+      printf("%s",obj->data.symbol.value);
+      break;
+    default:
+      pad(depth);
+      printf("x");
+      break;
+    }
+  printf("\n");
+}
+
+
 
 /********/
 /* repl */

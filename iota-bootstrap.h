@@ -10,6 +10,8 @@ typedef enum {OUTPUT, INPUT} directiontype;
 
 typedef struct object object;
 
+typedef struct object_stack object_stack;
+
 // fundamental things, symbols, streams, etc
 object *nil;
 object *t_symbol;
@@ -39,6 +41,20 @@ object *output_keyword;
 object *input_keyword;
 object *the_empty_environment;
 object *the_global_environment;
+
+//gc (naive mark-and-sweep)
+#ifndef N_HEAP
+#define N_HEAP 2000
+#endif
+object *free_list = NULL;
+object *active_list = NULL;
+object_stack *stack_roots = NULL;
+object *get_free_object();
+void push_stack_root(object **root);
+object **pop_stack_root();
+int mark(object *obj);
+void gc();
+
 
 // constructors
 object *alloc_object();
