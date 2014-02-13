@@ -167,7 +167,8 @@ void gc() {
       next = iterator->next;
       old_free_list = free_list;
       free_list = iterator;
-      prev->next = next;
+      if(prev != NULL)
+        prev->next = next;
       free_list->next = old_free_list;
       iterator = next;
     }
@@ -184,13 +185,32 @@ void gc() {
 }
 
 int mark(object *obj) {
-  int count = 1 - obj->mark;
+  //int count = 1 - obj->mark;
+  int count = 1;
+  if(obj->mark == 1)
+    return 0;
   obj->mark = 1;
-  if(is_cons(obj)) {
+  switch(obj->type) {
+  case CONS:
     return count + mark(car(obj)) + mark(cdr(obj));
-  }
-  else
+    break;
+  //case PRIMITIVE_PROC:
+  //  return count + mark(obj->data.primitive_proc.fn);
+  //  break;
+  case COMPOUND_PROC:
+    return count + mark(obj->data.compound_proc.parameters) +
+      mark(obj->data.compound_proc.body) +
+      mark(obj->data.compound_proc.env);
+    break;
+  case MACRO:
+    return count + mark(obj->data.macro.parameters) +
+      mark(obj->data.macro.body) +
+      mark(obj->data.macro.env);
+    break;
+  default:
     return count;
+    break;
+  }
 }
 
 void error(char *msg) {
@@ -202,9 +222,10 @@ char is_nil(object *obj) {
   return obj->type == NIL;
 }
 
+//allocs
 object *make_symbol(char *value) {
-  object *obj;
-  object *element;
+  object *obj = nil;
+  object *element = nil;
 
   // search
   element = symbol_table;
@@ -218,17 +239,20 @@ object *make_symbol(char *value) {
   obj = alloc_object();
   obj->type = SYMBOL;
   obj->data.symbol.value = (char *) malloc(strlen(value) + 1);
-  push_stack_root(&obj);
-  if(!obj->data.symbol.value) return 0;
+  if(!obj->data.symbol.value) {
+    return 0;
+  }
   strcpy(obj->data.symbol.value, value);
+  push_stack_root(&obj);
   symbol_table = cons(obj, symbol_table);
   pop_stack_root();
   return obj;
 }
 
+//allocs
 object *make_keyword(char *value) {
-  object *obj;
-  object *element;
+  object *obj = nil;
+  object *element = nil;
 
   // search
   element = keyword_table;
@@ -242,10 +266,10 @@ object *make_keyword(char *value) {
   obj = alloc_object();
   obj->type = KEYWORD;
   obj->data.keyword.value = (char *) malloc(strlen(value) + 1);
-  push_stack_root(&obj);
   if(!obj->data.keyword.value)
     return 0;
   strcpy(obj->data.keyword.value, value);
+  push_stack_root(&obj);
   keyword_table = cons(obj, keyword_table);
   pop_stack_root();
   return obj;
@@ -259,6 +283,7 @@ char is_keyword(object *obj) {
   return obj->type == KEYWORD;
 }
 
+//allocs
 object *make_fixnum(long value) {
   object *obj;
 
@@ -272,6 +297,7 @@ char is_fixnum(object *obj) {
   return obj->type == FIXNUM;
 }
 
+//allocs
 object *make_character(char value) {
   object *obj;
 
@@ -285,6 +311,7 @@ char is_character(object *obj) {
   return obj->type == CHARACTER;
 }
 
+//allocs
 object *make_string(char *value) {
   object *obj;
 
@@ -302,6 +329,7 @@ char is_string(object *obj) {
   return obj->type == STRING;
 }
 
+//allocs
 object *cons(object *first, object *rest) {
   object *obj;
 
@@ -337,6 +365,7 @@ char is_input_stream(object *obj) {
   return is_stream(obj) && obj->data.stream.directiontype == INPUT;
 }
 
+//allocs
 object *make_file_stream(char* stream_name, directiontype direction) {
   object *obj;
   int fd;
@@ -392,7 +421,8 @@ long len(object *obj) {
     return l;
   }
 }
-    
+
+//allocs
 object *make_primitive_proc(object *(*fn)(struct object *args, struct object *env)) {
   object *obj;
 
@@ -747,6 +777,7 @@ object *close_stream_proc(object *args, object *env) {
   return t_symbol;
 }
 
+//allocs
 object *make_compound_proc(object *params,
                            object *body,
                            object *env) {
@@ -792,7 +823,7 @@ object *frame_values(object *frame) {
 void add_binding_to_frame(object *var,
                           object *val,
                           object *frame) {
-  object *result;
+  object *result = nil;
   push_stack_root(&result);
   result = cons(var, car(frame) );
   car(frame) = result;
@@ -805,7 +836,7 @@ object *extend_environment(object *vars,
                            object *vals,
                            object *base_env) {
   assert( is_list(base_env) );
-  object *result;
+  object *result = nil;
   push_stack_root(&result);
   result = make_frame(vars, vals);
   result = cons(result, base_env);
@@ -1089,13 +1120,9 @@ object *read_pair(object *in_stream, object *env) {
   FILE *in;
   int c;
 
-  object *first_obj;
-  object *rest_obj;
-  object *result;
-
-  
-  
-  
+  object *first_obj = nil;
+  object *rest_obj = nil;
+  object *result = nil;
 
   if(in_stream == stdin_stream)
     in_stream = eval(stdin_symbol, env);
@@ -1107,28 +1134,27 @@ object *read_pair(object *in_stream, object *env) {
   if(c == ')')
     return nil;
   ungetc(c, in);
-  
-  first_obj = read(in_stream, env);
-  push_stack_root(&first_obj);
 
+  push_stack_root(&first_obj);
+  first_obj = read(in_stream, env);
+  
   eat_whitespace(in);
 
-  
   c = getc(in);
   if (c == '.') {
     c = peek(in);
     if (!is_delimiter(c)) {
       error("Dot not followed by delimiter");
     }
-    rest_obj = read(in_stream, env);
     push_stack_root(&rest_obj);
+    rest_obj = read(in_stream, env);
     eat_whitespace(in);
     c = getc(in);
     if (c != ')') {
       error("Unclosed list.");
     }
-    result = cons(first_obj, rest_obj);
     push_stack_root(&result);
+    result = cons(first_obj, rest_obj);
     for(i=0;i<3;i++) {
       pop_stack_root();
     }  
@@ -1136,10 +1162,10 @@ object *read_pair(object *in_stream, object *env) {
   }
   else {
     ungetc(c, in);
-    rest_obj = read_pair(in_stream, env);
     push_stack_root(&rest_obj);
-    result = cons(first_obj, rest_obj);
+    rest_obj = read_pair(in_stream, env);
     push_stack_root(&result);
+    result = cons(first_obj, rest_obj);
     for(i=0;i<3;i++) {
       pop_stack_root();
     }
@@ -1156,7 +1182,7 @@ object *read(object *in_stream, object *env) {
   char character;
   char buffer[BUFFER_MAX];
   char error_msg[BUFFER_MAX];
-  object *result;
+  object *result = nil;
 
   if(in_stream == stdin_stream)
     in_stream = eval(stdin_symbol, env);
@@ -1340,7 +1366,8 @@ object *read_proc(object *args, object *env) {
   object *ins;
   //env = car(args);
   if( is_nil(args) ) {
-    ins = eval(make_symbol("*stdin*"), env);
+    //ins = eval(make_symbol("*stdin*"), env);
+    ins = eval(stdin_symbol, env);
   }
   else {
     ins = car(args);
@@ -1429,7 +1456,7 @@ object *if_alternative(object *exp) {
 }
 
 object *make_lambda(object *params, object *body) {
-  object *result;
+  object *result = nil;
   push_stack_root(&result);
   result = cons(params, body);
   result = cons(lambda_symbol, result);
@@ -1458,7 +1485,7 @@ char is_macro (object *obj) {
 char is_macro_def(object *exp) {
   return is_tagged_list(exp, macro_symbol);
 }
-
+//allocs
 object *make_macro(object *params,
                    object *body,
                    object *env) {
@@ -1504,7 +1531,7 @@ object *sequence_to_exp(object *seq) {
 object *make_if(object *pred,
                 object *conseq,
                 object *alt) {
-  object *result;
+  object *result = nil;
   push_stack_root(&result);
   result = cons(alt, nil);
   result = cons(conseq, result);
@@ -1579,16 +1606,21 @@ object *rest_operands(object *ops) {
 
 object *eval_sequence(object *exps, object *env) {
   assert( is_list(exps) );
+  object *result = nil;
+  push_stack_root(&result);
   while(!is_last_exp(exps)) {
-    eval(car(exps), env);
+    result = eval(car(exps), env);
     exps = cdr(exps);
   }
-  return eval(car(exps), env);
+  result = eval(car(exps), env);
+  pop_stack_root();
+  return result;
 }
 
 object *list_of_values(object *exps, object *env) {
   assert( is_list(exps) );
-  object *result1, *result2;
+  object *result1 = nil;
+  object *result2 = nil;
   if (is_no_operands(exps)) {
     return nil;
   }
@@ -1606,8 +1638,8 @@ object *list_of_values(object *exps, object *env) {
 
 object *copy_list(object *list) {
   assert( is_list(list) );
-  object *iterator;
-  object *new_list;
+  object *iterator = nil;
+  object *new_list = nil;
 
   iterator = list;
   push_stack_root(&new_list);
@@ -1650,58 +1682,80 @@ object *parse_args(object *args, object *params) {
 
 object *parse_params(object *params) {
   assert( is_list(params) );
-  object *param_iterator, *cleaned_params;
+  object *param_iterator = nil;
+  object *cleaned_params = nil;
+  object *reversed_cleaned_params = nil;
 
   // fix the params
   param_iterator = params;
   cleaned_params = nil;
+  push_stack_root(&cleaned_params);
   while(!is_nil(param_iterator)) {
     if(!is_eq(car(param_iterator),rest_keyword))
       cleaned_params = cons(car(param_iterator),cleaned_params);
     param_iterator = cdr(param_iterator);
   }
-  return reverse(cleaned_params);
+  reversed_cleaned_params = reverse(cleaned_params);
+  pop_stack_root();
+  return reversed_cleaned_params;
 }
 
 object *apply(object *proc, object *args, object *env) {
   assert( is_list(args) );
   object *exp;
-  object *parsed_args;
-  object *parsed_params;
+  object *parsed_args = nil;
+  object *parsed_params = nil;
+  object *result = nil;
   if (is_primitive_proc(proc))
     return (proc->data.primitive_proc.fn)(args, env);
   else if (is_compound_proc(proc)) {
+    push_stack_root(&parsed_args);
     parsed_args = parse_args(args, proc->data.compound_proc.parameters);
+    push_stack_root(&parsed_params);
     parsed_params = parse_params(proc->data.compound_proc.parameters);
     exp = proc->data.compound_proc.body;
-    return eval_sequence(exp,
+    push_stack_root(&result);
+    result = eval_sequence(exp,
                          extend_environment(
                            parsed_params,
                            parsed_args,
                            proc->data.compound_proc.env));
+    pop_stack_root();
+    pop_stack_root();
+    pop_stack_root();
+    return result;
   }
   else {
+    #ifdef DEBUG
     write(proc, stdout_stream, env);
     write(args, stdout_stream, env);
+    #endif
     error("Unknown procedure type");
   }
 }
 object *macroexpand(object *proc, object *args) {
   assert( is_list(args) );
   object *body;
-  object *expanded_body;
-  object *parsed_params;
-  object *parsed_args;
+  object *expanded_body = nil;
+  object *parsed_params = nil;
+  object *parsed_args = nil;
   
   if(is_macro(proc)) {
+    push_stack_root(&parsed_args);
     parsed_args = parse_args(args, proc->data.macro.parameters);
+    push_stack_root(&parsed_params);
     parsed_params = parse_params(proc->data.macro.parameters);
     body = proc->data.macro.body;
+    push_stack_root(&expanded_body);
     expanded_body = eval_sequence(body,
                                   extend_environment(
                                     parsed_params,
                                     parsed_args,
                                     proc->data.macro.env));
+    pop_stack_root();
+    pop_stack_root();
+    pop_stack_root();
+    return expanded_body;
   }
   //else if(proc->data.macro.expanded) {
   //  expanded_body = body;
@@ -1710,7 +1764,7 @@ object *macroexpand(object *proc, object *args) {
     error("Macro not found.");
   }
     
-  return expanded_body;
+
 }
 
 object *macroexpand_proc(object *exps, object *env) {
@@ -1772,16 +1826,18 @@ char is_spliced(object *exp) {
 
 object *eval_sequence_head(object *exp, object *env) {
   assert( is_list(exp) );
-  object *head;
-  object *this;
-  object *result;
+  object *head = nil;
+  object *this = nil;
+  object *result = nil;
   push_stack_root(&result);
-  result = cons(eval(car(exp), env), nil);
+  result = eval(car(exp), env);
+  result = cons(result, nil);
   head = result;
   this = head;
   exp = cdr(exp);
   while(!is_nil(exp)) {
-    result = cons(eval(car(exp), env), nil);
+    result = eval(car(exp), env);
+    result = cons(result, nil);
     this->data.cons.rest = result;
     this = result;
     exp = cdr(exp);
@@ -1864,20 +1920,30 @@ char is_piped(object *exp) {
 
 object *let_to_combination(object *let_exp) {
   object *bindings;
-  object *vars;
-  object *exps;
+  object *vars = nil;
+  object *exps = nil;
   object *body;
-
+  object *result = nil;
+  push_stack_root(&result);
+  push_stack_root(&vars);
+  push_stack_root(&exps);
   bindings = cadr(let_exp);
   vars = cars_of_list(bindings);
   exps = cadrs_of_list(bindings);
   body = cddr(let_exp);
 
-  return cons(make_lambda(vars, body), exps);
+  result = make_lambda(vars, body);
+  result = cons(result, exps);
+  pop_stack_root();
+  pop_stack_root();
+  pop_stack_root();
+  return result;
 }
 
 object *eval(object *exp, object *env) {
-  object *proc, *args;
+  object *proc = nil;
+  object *args = nil;
+  object *result = nil;
   while(1) {
     if(is_self_evaluating(exp)) {
       return exp;
@@ -1923,9 +1989,13 @@ object *eval(object *exp, object *env) {
                         env);
     }
     else if (is_application(exp)) {
+      push_stack_root(&proc);
       proc = eval(operator(exp), env);
+      push_stack_root(&args);
       args = operands(exp);
       if(is_primitive_proc(proc) && proc->data.primitive_proc.fn == eval_proc) {
+        pop_stack_root();
+        pop_stack_root();
         exp = eval(car(args), env);
         env = eval(cadr(args), env);
         continue;
@@ -1935,7 +2005,12 @@ object *eval(object *exp, object *env) {
         args = eval(prepare_args_for_apply(cdr(args)), env);
       }
       if(is_macro(proc)) {
-        return apply_macro(proc, args, env);
+        push_stack_root(&result);
+        result = apply_macro(proc, args, env);
+        pop_stack_root();
+        pop_stack_root();
+        pop_stack_root();
+        return result;
       }
       else {
         args = list_of_values(args, env);
@@ -1943,7 +2018,12 @@ object *eval(object *exp, object *env) {
         //   (proc->data.primitive_proc.fn == write_proc ||
         //    proc->data.primitive_proc.fn == read_proc))
         //  args = cons(env, args);
-        return apply(proc, args, env);
+        push_stack_root(&result);
+        result = apply(proc, args, env);
+        pop_stack_root();
+        pop_stack_root();
+        pop_stack_root();
+        return result;
       }
     }
     else {
@@ -2030,7 +2110,8 @@ object *write_proc(object *args, object *env) {
 
   obj = car(args);
   if(is_nil(cdr(args)))
-    out_stream = eval(make_symbol("*stdout*"), env);
+    //out_stream = eval(make_symbol("*stdout*"), env);
+    out_stream = eval(stdout_symbol, env);
   else
     out_stream = cadr(args);
 
