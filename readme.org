@@ -23,14 +23,14 @@ run:
 
 ** What it doesn't have
    + Booleans (nil serves as false)
-   + Garbage collection.
+   + +Garbage collection.+ This branch has mark-and-sweep, not yet fully tested.
 
 ** What I want it to have
    + Self-hosted compilation, maybe to some kind of iota bytecode, maybe to javascript, maybe to C, maybe to all three.
    + Much more introspection.
    + Better arg parsing.
    + More (fast) fundamental data structures, like maps/hashtables/dictionaries and resizable vectors.
-   + Garbage collection.
+   + Better garbage collection.
 
 ** Acknowledgements
 Big chunks of iota were built based on Peter Michaux's [[http://michaux.ca/articles/scheme-from-scratch-introduction][Scheme from
