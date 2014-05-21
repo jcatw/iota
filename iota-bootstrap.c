@@ -1864,11 +1864,11 @@ object *eval_backquoted(object *exp, object *env, int backquote_depth) {
     if (is_spliced(car(exp))) {
       thing_to_splice = text_of_quotation(car(exp));
       //head = eval(thing_to_splice, env);
-      push_stack_root(&head)
+      push_stack_root(&head);
       head = maybe_eval_backquoted(thing_to_splice, env, --backquote_depth);
       if(is_nil(head)) {
         //return eval_backquoted(cdr(exp), env);
-        push_stack_root(&result)
+        push_stack_root(&result);
         result = eval_backquoted(cdr(exp), env, backquote_depth);
         pop_stack_root();
         pop_stack_root();
