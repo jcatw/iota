@@ -1849,9 +1849,10 @@ object *eval_sequence_head(object *exp, object *env) {
       
 object *eval_backquoted(object *exp, object *env, int backquote_depth) {
   object *thing_to_splice;
-  object *head;
+  object *head = nil;
   object *this;
   object *cdr_eval;
+  object *result = nil;
   if(is_escaped(exp)) {
     //return eval(text_of_quotation(exp), env);
     return maybe_eval_backquoted(text_of_quotation(exp), env, --backquote_depth);
@@ -1863,10 +1864,15 @@ object *eval_backquoted(object *exp, object *env, int backquote_depth) {
     if (is_spliced(car(exp))) {
       thing_to_splice = text_of_quotation(car(exp));
       //head = eval(thing_to_splice, env);
+      push_stack_root(&head)
       head = maybe_eval_backquoted(thing_to_splice, env, --backquote_depth);
       if(is_nil(head)) {
         //return eval_backquoted(cdr(exp), env);
-        return eval_backquoted(cdr(exp), env, backquote_depth);
+        push_stack_root(&result)
+        result = eval_backquoted(cdr(exp), env, backquote_depth);
+        pop_stack_root();
+        pop_stack_root();
+        return result;
       }
       if(!is_cons(head)) {
         printf("%d\n",thing_to_splice->type);

@@ -1,0 +1,51 @@
+(define (eval form env)
+  (cond ((is-self-evaluating? form) form)
+	((is-variable? form) (lookup-variable-value form))
+	((is-quoted? form) (let ((text-of-quotation (cadr form)))
+			     text-of-quotation))
+	((is-backquoted? form) (eval-backquoted form))
+	((is-piped? form) (eval (cadr form) env))
+	((is-assignment? form) (eval-assignment form))
+	((is-definition? form) (eval-definition form))
+	((is-if? form) (let ((if-predicate (cadr form))
+			     (if-consequent (caddr form))
+			     (if-alternative (if (nil? (cdddr form)) nil (cadddr form))))
+			 (if (not (is-nil (eval if-predicate env)))
+			     (eval if-consequent env)
+			     (eval if-alternative env))))
+	((is-cond? form) (eval (cond->if form) env))
+	((is-let? form) (eval (let->combination form) env))
+	((is-begin? form) (let ((begin-actions (cdr form)))
+			    (eval-sequence begin-actions env)))
+	((is-lambda? form) (let ((lambda-parameters (cadr form))
+				 (lambda-body (cddr form)))
+			     (make-compound-proc lambda-parameters lambda-body env)))
+	((is-macro-def? form) (let ((macro-parameters (cadr form))
+				    (macro-body (cddr form)))
+				(make-macro macro-parameters macro-body env)))
+	((is-application? form) (let ((proc (eval (car form)))
+				      (args (cdr form)))
+				  (if (is-macro? proc)
+				      (apply-macro proc args env)
+				      (let ((args (map (lambda (arg) (eval arg env)) args)))
+					(apply proc args env)))))
+	(else (error "Cannot eval unknown expression type."))))
+
+(define make-tagged-list-preds
+  (macro
+   (pairs)
+   (if (nil? pairs) t
+     (let ((pair (car pairs)))
+       (cond ((nil? pair) t)
+	     (else 
+	      (let ((name (car pair))
+		    (sym (cadr pair)))
+		`(define (,name form) (if (list? form) (eq? (car form) ,sym) nil)))
+	      (make-tagged-list-preds (cdr pairs)))))))
+
+(map make-tagged-list-pred
+  '((is-quoted? 'quote)
+    (is-assignment? 'set!)
+    (is-backquoted? 'backquote)))
+    
+    

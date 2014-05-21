@@ -1,7 +1,7 @@
 CC = gcc
-CFLAGS = -lm
+CFLAGS = -lm -DN_HEAP=4000
 DEBUGFLAGS = -g -ggdb
-LDFLAGS = -lm
+LDFLAGS = -lm -DN_HEAP=4000
 
 DEPEND = makedepend
 DEPEND_FLAGS = -Y   # suppresses shared includes
